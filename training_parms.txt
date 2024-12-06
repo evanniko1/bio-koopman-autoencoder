@@ -2,59 +2,8 @@
 
 # The objective of the examples is to benchmark and baseline the code with specific parameter values. Train size unless otherwise documented is set to 50% and epochs are set to 250 for fast iterations.
 
-# Example pendulum linearized WITHOUT noise and multilayer perceptron
-python3 driver.py --alpha 1 --model koopmanAE --dataset pendulum_lin --noise 0.0 --lr 1e-2 --epochs 250 --batch 64 --folder results_det_pendulum_lin_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 1
-
-# Example pendulum linearized WITH noise and multilayer perceptron
-python3 driver.py --alpha 1 --dataset pendulum_lin --noise 0.2 --lr 1e-2 --epochs 250 --batch 64 --folder results_det_pendulum_lin_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 1
-
-# Example pendulum non-linearized WITHOUT noise and multilayer perceptron
-python3 driver.py --alpha 1 --model koopmanAE --dataset pendulum --noise 0.0 --lr 1e-2 --epochs 250 --batch 64 --folder results_det_pendulum_lin_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 1
-
-# Example pendulum non-linearized WITH noise and multilayer perceptron
-python3 driver.py --alpha 1 --model koopmanAE --dataset pendulum --noise 0.2 --lr 1e-2 --epochs 100 --batch 64 --folder results_det_pendulum_lin_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 1
-
-# Example discrete spectrum and multilayer perceptron
-python3 driver.py --alpha 1 --model koopmanAE --dataset discrete_spectrum --noise 0.0 --lr 1e-2 --epochs 100 --batch 64 --folder results_discrete_spectrum --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 1
-
-# Example discrete spectrum and KAN
-python3 driver.py --alpha 1 --model koopmanAE_KAN --dataset discrete_spectrum --noise 0.0 --lr 1e-2 --epochs 100 --batch 64 --folder results_det_pendulum_lin_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 1
-
-# Example pendulum linearized without noise
-############################################
-python3 driver.py --alpha 1 --dataset pendulum_lin --noise 0.0 --lr 1e-2 --epochs 600 --batch 64 --folder results_det_pendulum_lin_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 1
-
-python3 driver.py --alpha 1 --dataset pendulum_lin --noise 0.0 --lr 1e-2 --epochs 600 --batch 64 --folder results_det_back_pendulum_lin_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 1 --steps_back 8 --nu 1e-1 --eta 1e-2 --seed 1
-
-
-# Example pendulum linearized with noise 0.03
-##############################################
-python3 driver.py --alpha 1 --dataset pendulum_lin --noise 0.03 --lr 1e-2 --epochs 600 --batch 64 --folder results_det_pendulum_lin_6_noise_03 --lamb 1 --steps 8 --bottleneck 6 --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --wd 0 --seed 1
-
-python3 driver.py --alpha 1 --dataset pendulum_lin --noise 0.03 --lr 1e-2 --epochs 600 --batch 64 --folder results_det_back_pendulum_lin_6_noise_03 --lamb 1 --steps 8 --bottleneck 6  --lr_update 30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 1 --steps_back 8 --nu 1e-1  --eta 1e-2 --seed 1
-
-
-
-# Example pendulum with without noise
-##############################################
-python driver.py --alpha 1 --dataset pendulum --noise 0.0 --lr 1e-2 --epochs 600 --batch 64 --folder results_det_pendulum_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update  30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 0
-
-python driver.py --alpha 1 --dataset pendulum --noise 0.0 --lr 1e-2 --epochs 600 --batch 64 --folder results_det_back_pendulum_6 --lamb 1 --steps 8 --bottleneck 6  --lr_update  30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 1 --steps_back 8 --nu 1e-1 --eta 1e-2 --seed 0
-
-
-
-# Example pendulum with noise 0.08
-##############################################
-python driver.py --alpha 1 --dataset pendulum --noise 0.08 --lr 1e-2 --epochs 600 --batch 64 --folder results_det_pendulum_6_noise_03 --lamb 1 --steps 8 --bottleneck 6  --lr_update  30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 0 --seed 7
-
-python driver.py --alpha 1 --dataset pendulum --noise 0.08 --lr 1e-2 --epochs 600 --batch 64 --folder results_det_back_pendulum_6_noise_03 --lamb 1 --steps 8 --bottleneck 6  --lr_update  30 200 400 500 --lr_decay 0.2 --pred_steps 1000 --backward 1 --steps_back 8 --nu 1e-1 --eta 1e-2 --seed 7
-
-
+####################################
 # Example isolated repressilator
-python3 driver_upd.py --alpha 2 --model koopmanAE --dataset isolated_repressilator --lr 1e-3 --epochs 100 --batch 128 --folder results_isolated_repr --bottleneck 15 --backward 0 --pred_steps 50 --seed 7
-
-python3 driver_upd.py --alpha 2 --model koopmanAE_KAN --dataset isolated_repressilator --lr 1e-3 --epochs 100 --batch 128 --folder results_isolated_repr --bottleneck 15 --backward 0 --pred_steps 50 --seed 7
-
 # make 'chebyshev', 'bessel', 'fibonacci', 'gegenbauer', 'hermite', 'jacobi', 'laguerre', and 'legendre' models
 
 # repressilator polyKAN autoencoders
@@ -110,6 +59,6 @@ python3 driver_upd.py --alpha 2 --model koopmanAE_KAN --dataset isolated_repress
 
 [DONE] python3 driver_upd.py --alpha 2 --model koopmanAE --dataset duffing_oscillator --lr 1e-3 --epochs 250 --batch 128 --folder duffing_mlp --bottleneck 6 --backward 0 --pred_steps 100 --seed 7
 
-############
+############ 
 # HOST-AWARE
 python3 driver_upd.py --alpha 2 --model koopmanAE --dataset host_aware_repressilator --lr 1e-3 --epochs 10 --batch 128 --folder host_aware_repr_mlp --bottleneck 6 --backward 0 --pred_steps 2 --seed 7
