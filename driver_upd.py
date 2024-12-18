@@ -82,7 +82,8 @@ parser.add_argument('--degree', type=int, default=4, help='degree for polynomial
 #
 parser.add_argument('--seed', type=int, default='1',  help='seed value')
 #
-
+parser.add_argument('--policy', type=str, default='KoopmanAE',  help='training policy')
+#
 args = parser.parse_args()
 
 torch.backends.cudnn.deterministic = True
@@ -124,6 +125,7 @@ elif args.dataset == "host_aware_repressilator":
             sol_df.index = [idx]*len(temp_list)
         data = pd.concat([data, sol_df])
 else:
+    print('Loading data...')
     X, Xclean, m, n = data_from_name(args.dataset, noise = args.noise, theta = args.theta, orthogonal_project = args.orthogonal_projection)
     Xtrain, Xtest = train_test(X, percent = args.train_size)
     Xtrain_clean, Xtest_clean = Xtrain, Xtest
@@ -135,6 +137,7 @@ else:
 # transfer to tensor
 if "pendulum" in args.dataset:
     # in case we choose the pendulum dataset
+    print('Pendulum dataset')
     Xtrain, Xtrain_clean = add_channels(Xtrain), add_channels(Xtrain_clean)
     Xtest, Xtest_clean = add_channels(Xtest),add_channels(Xtest_clean)
     Xtrain, Xtrain_clean = torch.from_numpy(Xtrain).float().contiguous(), torch.from_numpy(Xtrain_clean).float().contiguous()
@@ -223,11 +226,35 @@ model, optimizer, epoch_hist = train(model, train_loader,
                                      backward=args.backward, 
                                      steps=args.steps, 
                                      steps_back=args.steps_back,
-                                     gradclip=args.gradclip
+                                     gradclip=args.gradclip,
+                                     policy=args.policy
                                      )
 
 
 torch.save(model.state_dict(), args.folder + '/model'+'.pkl')
+
+#******************************************************************************
+# Plot loss against epoch
+#******************************************************************************
+
+if args.policy == 'AE':
+    def plot_loss(epoch_hist, folder):
+        fig = plt.figure(figsize=(15,12))
+        plt.plot(epoch_hist, 'o--', lw=3, label='Training Reconstruction loss', color='#377eb8')
+        plt.tick_params(axis='x', labelsize=22)
+        plt.tick_params(axis='y', labelsize=22)
+        plt.locator_params(axis='y', nbins=10)
+        plt.locator_params(axis='x', nbins=10)
+        plt.ylabel('Loss', fontsize=22)
+        plt.xlabel('Epoch', fontsize=22)
+        plt.grid(False)
+        plt.legend(fontsize=22)
+        fig.tight_layout()
+        plt.savefig(folder +'/000loss' +'.png')
+        plt.close()
+
+    plot_loss(epoch_hist, args.folder)
+    exit()
 
 
 #******************************************************************************
