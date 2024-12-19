@@ -184,7 +184,8 @@ def DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed):
         xhat.index = [j]*lenT
         # append the data
         data = pd.concat([data, xhat])
-
+    print('The shape of the dataframe')
+    print(data.shape)
     return data
 
 def discrete_data_format(df,chunk_size=1):

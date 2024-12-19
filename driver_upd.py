@@ -138,12 +138,17 @@ else:
 if "pendulum" in args.dataset:
     # in case we choose the pendulum dataset
     print('Pendulum dataset')
+    print('the shape of the data is: ', Xtrain.shape)
     Xtrain, Xtrain_clean = add_channels(Xtrain), add_channels(Xtrain_clean)
     Xtest, Xtest_clean = add_channels(Xtest),add_channels(Xtest_clean)
     Xtrain, Xtrain_clean = torch.from_numpy(Xtrain).float().contiguous(), torch.from_numpy(Xtrain_clean).float().contiguous()
     Xtest, Xtest_clean = torch.from_numpy(Xtest).float().contiguous(), torch.from_numpy(Xtest_clean).float().contiguous()
 else:
     X = discrete_data_format(data)
+    # scalling the data
+    #X = 2 * (X - X.min()) / (X.max() - X.min()) - 1
+    # concatenate dimension 0 and 1 in one dimension 
+    X = X.reshape(X.shape[0]*X.shape[1], X.shape[2])
     X = add_channels(X)
     Xtrain, Xtest = train_test(X, percent = args.train_size)
     Xtrain_clean = Xtrain.clone()
@@ -153,37 +158,78 @@ else:
 #******************************************************************************
 # Create Dataloader objects
 #******************************************************************************
-trainDat = []
-start = 0
-for i in np.arange(args.steps,-1, -1):
-    if i == 0:
-        trainDat.append(Xtrain[start:].float())
-    else:
-        trainDat.append(Xtrain[start:-i].float())
-    start += 1
 
-train_data = torch.utils.data.TensorDataset(*trainDat)
-del(trainDat)
+if args.dataset == "pendulum":
+    trainDat = []
+    start = 0
+    for i in np.arange(args.steps,-1, -1):
+        if i == 0:
+            trainDat.append(Xtrain[start:].float())
+        else:
+            trainDat.append(Xtrain[start:-i].float())
+        start += 1
 
-train_loader = DataLoader(dataset = train_data,
-                          batch_size = args.batch,
-                          shuffle = True)
+    train_data = torch.utils.data.TensorDataset(*trainDat)
+    del(trainDat)
 
-testDat = []
-start = 0 
-for i in np.arange(args.steps, -1, -1):
-    if i == 0:
-        testDat.append(Xtest[start:].float())
-    else:
-        testDat.append(Xtest[start:-i].float())
-    start +=  1
+    train_loader = DataLoader(dataset = train_data,
+                            batch_size = args.batch,
+                            shuffle = True)
 
-test_data = torch.utils.data.TensorDataset(*testDat)
-del(testDat)
+    testDat = []
+    start = 0 
+    for i in np.arange(args.steps, -1, -1):
+        if i == 0:
+            testDat.append(Xtest[start:].float())
+        else:
+            testDat.append(Xtest[start:-i].float())
+        start +=  1
 
-test_loader = DataLoader(dataset = test_data,
-                         batch_size = args.batch,
-                         shuffle = False)
+    test_data = torch.utils.data.TensorDataset(*testDat)
+    del(testDat)
+
+    test_loader = DataLoader(dataset = test_data,
+                            batch_size = args.batch,
+                            shuffle = False)
+
+else:
+    trainDat = [torch.empty(0) for _ in range(args.steps + 1)]
+
+    for i in range(int(len(Xtrain)/50)):
+        traj = Xtrain[i*50 : (i+1)*50-1].float()
+        start = 0
+        for j in np.arange(args.steps,-1, -1):
+            if j == 0:
+                trainDat[0] = torch.cat((trainDat[0], traj[start:].float()), dim=0)
+            else:
+                trainDat[j] = torch.cat((trainDat[j], traj[start:-j].float()), dim=0)
+            start += 1
+
+    train_data = torch.utils.data.TensorDataset(*trainDat)
+    del(trainDat)
+
+    train_loader = DataLoader(dataset = train_data,
+                            batch_size = args.batch,
+                            shuffle = True)
+
+    testDat = [torch.empty(0) for _ in range(args.steps + 1)]
+
+    for i in range(int(len(Xtest)/50)):
+        traj = Xtest[i*50 : (i+1)*50-1].float()
+        start = 0
+        for j in np.arange(args.steps,-1, -1):
+            if j == 0:
+                testDat[0] = torch.cat((testDat[0], traj[start:].float()), dim=0)
+            else:
+                testDat[j] = torch.cat((testDat[j], traj[start:-j].float()), dim=0)
+            start += 1
+
+    test_data = torch.utils.data.TensorDataset(*testDat)
+    del(testDat)
+
+    test_loader = DataLoader(dataset = test_data,
+                            batch_size = args.batch,
+                            shuffle = False)
 #==============================================================================
 # Model
 #==============================================================================
