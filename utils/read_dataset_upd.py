@@ -1,4 +1,5 @@
 import os
+import pickle
 import random
 import math
 import tqdm
@@ -13,11 +14,14 @@ import torch
 #******************************************************************************
 # Read in data util functions
 #******************************************************************************
-def data_from_name(name, combi_n = 100, combi_n_samples = 50, time_points = 50, time_intervals = 10, noise = 0.0, theta=2.4, orthogonal_project=False):
+def data_from_name(name, combi_n = 50, combi_n_samples = 100, time_points = 50, time_intervals = 10, noise = 0.0, theta=2.4, orthogonal_project=False,path = 'data/'):
+    path = os.path.join(os.getcwd(), path)
+    if not os.path.exists(path):
+        os.makedirs(path)
     if name == 'pendulum_lin':
-        return pendulum_lin(noise, orthog_project=orthogonal_project)      
+        return pendulum_lin(noise, orthog_project=orthogonal_project,path=path)      
     elif name == 'pendulum':
-        return pendulum_lin(noise, theta, lin=False, orthog_project=orthogonal_project)    
+        return pendulum_lin(noise, theta, lin=False, orthog_project=orthogonal_project,path=path)    
     elif name == 'discrete_spectrum':
         x1range = [-3.1, 3.1]
         x2range = [-2,2]
@@ -26,23 +30,20 @@ def data_from_name(name, combi_n = 100, combi_n_samples = 50, time_points = 50, 
         lamda = -1
         numICs = 5000
         seed = 42
-        return DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed)
+        return DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed, path=path)
     elif name == "isolated_repressilator":
-        return isolated_repressilator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals)
+        return isolated_repressilator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals, path=path)
     elif name == "duffing_oscillator":
-        return duffing_oscillator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals)
+        return duffing_oscillator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals, path=path)
     else:
         raise ValueError('dataset {} not recognized'.format(name))
 
-def rescale(Xsmall, Xsmall_test):
-    # rescale data
-    Xmin = Xsmall.min()
-    Xmax = Xsmall.max()
+def rescale(Xtrain, Xtest):
+    # rescale data to [-1, 1]
+    Xtest = 2 * (Xtest - Xtrain.min()) / (Xtrain.max() - Xtrain.min()) - 1
+    Xtrain = 2 * (Xtrain - Xtrain.min()) / (Xtrain.max() - Xtrain.min()) - 1
     
-    Xsmall = ((Xsmall - Xmin) / (Xmax - Xmin)) 
-    Xsmall_test = ((Xsmall_test - Xmin) / (Xmax - Xmin)) 
-
-    return Xsmall, Xsmall_test
+    return Xtrain, Xtest
 
 def rotate_scale(samples_array, dims = (64,2)):
 
@@ -70,7 +71,7 @@ def train_test(samples_array, percent = 0.5):
 # Dynamical Systems functions -- the actual generators
 #******************************************************************************
 
-def pendulum_lin(noise, theta=0.8, lin=True, orthog_project=False):
+def pendulum_lin(noise, theta=0.8, lin=True, orthog_project=False, path = 'data/'):
     
     np.random.seed(0)
 
@@ -100,6 +101,10 @@ def pendulum_lin(noise, theta=0.8, lin=True, orthog_project=False):
         # Rotate to high-dimensional space and scale
         X = rotate_scale(X)
         Xclean = rotate_scale(Xclean)
+    
+    # save X and Xclean to file as pickle
+    np.save(os.path.join(path, 'pendulum_lin.npy'), X)
+    np.save(os.path.join(path, 'pendulum_lin_clean.npy'), Xclean)
 
     return X, Xclean, 64, 1
 
@@ -154,7 +159,7 @@ class DiscreteSpectrum():
         # Toni et al.:
         return np.linspace(0, 1, 51)
 
-def DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed):
+def DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed, path = 'data/'):
 
     # try some initial conditions for x1, x2
     random.seed(seed)
@@ -186,6 +191,10 @@ def DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed):
         data = pd.concat([data, xhat])
     print('The shape of the dataframe')
     print(data.shape)
+
+    # save data to file as pickle
+    data.to_pickle(os.path.join(path, 'discrete_spectrum.pkl'))
+
     return data
 
 def discrete_data_format(df,chunk_size=1):
@@ -387,7 +396,7 @@ def generate_data_repr(n, num_samples):
     np.random.shuffle(data)
     return data
 
-def isolated_repressilator_fn(n, num_samples, time_points, time_intervals):
+def isolated_repressilator_fn(n, num_samples, time_points, time_intervals, path = 'data/'):
     # generate time points
     times = np.linspace(0, time_intervals, time_points)
     # generate parameter and initial values combinations
@@ -401,6 +410,9 @@ def isolated_repressilator_fn(n, num_samples, time_points, time_intervals):
         sol_df.index = [idx]*len(times)
         # concatenate existing dataframes
         dataset = pd.concat([dataset, sol_df])
+    
+    # save data to file as pickle the name should be isolated_repressilator_nparameters_num_smaples_time_points_time_intervals.pkl
+    dataset.to_pickle(os.path.join(path, 'isolated_repressilator_{}_{}_{}_{}.pkl'.format(n, num_samples, time_points, time_intervals)))
 
     return dataset
 
@@ -602,7 +614,7 @@ def generate_data_dfn(n, num_samples):
     np.random.shuffle(data)
     return data
 
-def duffing_oscillator_fn(n, num_samples, time_points, time_intervals):
+def duffing_oscillator_fn(n, num_samples, time_points, time_intervals, path = 'data/'):
     # generate time points
     times = np.linspace(0, time_intervals, time_points)
     # generate parameter and initial values combinations
@@ -616,5 +628,7 @@ def duffing_oscillator_fn(n, num_samples, time_points, time_intervals):
         sol_df.index = [idx]*len(times)
         # concatenate existing dataframes
         dataset = pd.concat([dataset, sol_df])
+    # save dataset
+    dataset.to_pickle(os.path.join(path, 'duffing_oscillator_{}_{}_{}_{}.pkl'.format(n, num_samples, time_points, time_intervals)))
 
     return dataset

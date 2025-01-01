@@ -62,3 +62,10 @@
 ############ 
 # HOST-AWARE
 python3 driver_upd.py --alpha 2 --model koopmanAE --dataset host_aware_repressilator --lr 1e-3 --epochs 10 --batch 128 --folder host_aware_repr_mlp --bottleneck 6 --backward 0 --pred_steps 2 --seed 7
+
+
+###########
+# new script
+python3 run.py --alpha 2 --model koopmanAE  --dataset duffing_oscillator --lr 1e-3 --epochs 150 --batch 128 --folder isolated_duffing --bottleneck 6 --backward 0 --pred_steps 100 --seed 7 --policy AE
+
+# optimization
