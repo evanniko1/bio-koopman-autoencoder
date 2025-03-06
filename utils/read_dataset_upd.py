@@ -8,6 +8,7 @@ import pandas as pd
 from scipy.io import loadmat
 from scipy.special import ellipj, ellipk
 from scipy.integrate import odeint
+import matplotlib.pyplot as plt
 
 import torch
 
@@ -19,16 +20,18 @@ def data_from_name(name, combi_n = 50, combi_n_samples = 100, time_points = 50, 
     if not os.path.exists(path):
         os.makedirs(path)
     if name == 'pendulum_lin':
-        return pendulum_lin(noise, orthog_project=orthogonal_project,path=path)      
+        return pendulum_lin(noise, orthog_project=orthogonal_project,path=path)  
+    if name == 'simple':
+        return simple()    
     elif name == 'pendulum':
         return pendulum_lin(noise, theta, lin=False, orthog_project=orthogonal_project,path=path)    
     elif name == 'discrete_spectrum':
-        x1range = [-3.1, 3.1]
-        x2range = [-2,2]
-        tSpan = np.linspace(0, 1, 51)
+        x1range = [-0.5, 0.5]
+        x2range = [-0.5, 0.5]
+        tSpan = np.linspace(0, 1, 100)
         mu = -0.05
         lamda = -1
-        numICs = 5000
+        numICs = 500
         seed = 42
         return DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed, path=path)
     elif name == "isolated_repressilator":
@@ -43,16 +46,17 @@ def rescale(Xtrain, Xtest):
     Xtest = 2 * (Xtest - Xtrain.min()) / (Xtrain.max() - Xtrain.min()) - 1
     Xtrain = 2 * (Xtrain - Xtrain.min()) / (Xtrain.max() - Xtrain.min()) - 1
     
+    
     return Xtrain, Xtest
 
 def rotate_scale(samples_array, dims = (64,2)):
 
     # Rotate to high-dimensional space
-    Q = np.random.standard_normal((64,2))
-    Q,_ = np.linalg.qr(Q)
+    #Q = np.random.standard_normal((64,2))
+    #Q,_ = np.linalg.qr(Q)
     
     # rotate
-    samples_array = samples_array.T.dot(Q.T)        
+    #samples_array = samples_array.T.dot(Q.T)        
     
     # scale 
     samples_array = 2 * (samples_array - np.min(samples_array)) / np.ptp(samples_array) - 1
@@ -101,12 +105,65 @@ def pendulum_lin(noise, theta=0.8, lin=True, orthog_project=False, path = 'data/
         # Rotate to high-dimensional space and scale
         X = rotate_scale(X)
         Xclean = rotate_scale(Xclean)
+        m = 64
+    else:
+        # eye matrix
+        Q = np.eye(2)
+        X = X.T.dot(Q.T)
+        Xclean = X
+        Xclean = 2 * (Xclean - np.min(Xclean)) / np.ptp(Xclean) - 1
+        X = 2 * (X - np.min(X)) / np.ptp(X) - 1
+        m = 2
+
     
     # save X and Xclean to file as pickle
     np.save(os.path.join(path, 'pendulum_lin.npy'), X)
     np.save(os.path.join(path, 'pendulum_lin_clean.npy'), Xclean)
 
-    return X, Xclean, 64, 1
+    return X, Xclean, m, 1
+
+'''
+simple
+'''
+def simple():
+    A = np.array([
+
+    [0, -1, 0],    # First row
+
+    [1, 0, 0],     # Second row
+
+    [0, 0, -1]     # Third row - stable pole
+
+])
+    def system(state, t):
+
+        return A @ state
+    
+    t = np.linspace(0, 10, 100)
+
+    initial_conditions = (2 * np.random.rand(500, 3) - 1).tolist()
+
+    numICs = len(initial_conditions)
+
+    data = pd.DataFrame()
+
+    for i in range(numICs):
+
+        sol = odeint(system, initial_conditions[i], t)
+
+        df = pd.DataFrame(sol)
+
+        df.index = [i]*len(t)
+
+        data = pd.concat([data, df])
+        
+    data.to_pickle(os.path.join('data/', 'simple.pkl'))
+
+    return data
+
+'''
+simple'''
+
 
 class DiscreteSpectrum():
 
@@ -373,7 +430,10 @@ def simulator_repr(combination,y,times=None):
 # combination & number of samples
 def generate_data_repr(n, num_samples):
     # Generate the combinations
-    combinations = CombinationGenerator_repr(n)
+    if n == 1:
+        combinations = pd.DataFrame([[1, 1000, 5, 2]])
+    else:
+        combinations = CombinationGenerator_repr(n)
     # transform combinations dataframe into a list of list
     combinations = combinations.values.tolist()
     # initial conditions

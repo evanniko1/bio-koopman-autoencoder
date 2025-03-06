@@ -45,7 +45,7 @@ def get_args():
     #
     parser.add_argument('--bottleneck', type=int, default='6',  help='size of bottleneck layer')
     #
-    parser.add_argument('--lr_update', type=int, nargs='+', default=[30, 200, 400, 500], help='decrease learning rate at these epochs')
+    parser.add_argument('--lr_update', type=int, nargs='+', default=[30, 90, 120, 180], help='decrease learning rate at these epochs')
     #
     parser.add_argument('--lr_decay', type=float, default='0.2',  help='PCL penalty lambda hyperparameter')
     #
@@ -84,5 +84,11 @@ def get_args():
     parser.add_argument('--num_trials', type=int, default=10, help='number of trials')
     #
     parser.add_argument('--save', type=bool, default=True, help='save the model')
+    # this is the operator parameters
+    parser.add_argument('--operMethod', type=str, default='Consistent', help='method to train the operator')
+    #
+    parser.add_argument('--operHidden', type=int, default=2, help='number of hidden layers')
+    #
+    parser.add_argument('--operAlpha', type=int, default=1, help='model width')
 
     return parser.parse_args()

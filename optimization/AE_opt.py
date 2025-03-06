@@ -47,7 +47,9 @@ torch.cuda.manual_seed(args.seed)
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 set_seed(args.seed)
-device = get_device()
+# device is cuda else cpu
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Device: {device}")
 
 #******************************************************************************
 # Create folder to save results
@@ -97,7 +99,7 @@ def objective(trial):
     # Update parameters based on trial suggestions
     for opt_param in args.opt_params:
         if opt_param == 'lr':
-            args.lr = trial.suggest_loguniform("lr", 1e-5, 1e-2)
+            args.lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
         elif opt_param == 'batch':
             args.batch = trial.suggest_categorical('batch', batch_range)
         elif opt_param == 'steps':
@@ -110,7 +112,7 @@ def objective(trial):
             args.degree = trial.suggest_int('degree', 2, 10)
         elif opt_param == 'alpha':
             # the depth of the network
-            args.alpha = trial.suggest_loguniform('alpha', 0.5, 64)
+            args.alpha = trial.suggest_int('alpha', 1, 64, log=True)
         elif opt_param == 'hidden':
             # the number of hidden layers
             args.hidden = trial.suggest_int('hidden', 0, 50,5)

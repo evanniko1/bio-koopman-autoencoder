@@ -63,6 +63,10 @@
 # HOST-AWARE
 python3 driver_upd.py --alpha 2 --model koopmanAE --dataset host_aware_repressilator --lr 1e-3 --epochs 10 --batch 128 --folder host_aware_repr_mlp --bottleneck 6 --backward 0 --pred_steps 2 --seed 7
 
+#simple dynamics
+python3 run.py --alpha 3 --model koopmanAE  --dataset simple  --num_combinations 1 --num_samples 5000 --max_time 30 --time_steps 100 --lr 1e-3 --epochs 100 --batch 64 --folder simple --bottleneck 6  --pred_steps 100 --seed 7 --steps 20  --policy 
+KoopmanAE 
+
 
 ###########
 # new script

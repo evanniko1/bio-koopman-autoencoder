@@ -1,4 +1,5 @@
 import argparse
+import time
 
 import pandas as pd
 import numpy as np
@@ -26,11 +27,16 @@ def data_preprocessing(args):
             data = data_from_name(args.dataset, orthogonal_project=args.orthogonal_projection)
         else:
             data = pd.read_pickle(os.path.join(os.getcwd(), 'data', 'discrete_spectrum.pkl'))
+    elif args.dataset == "simple":
+        if not os.path.isfile(os.path.join(os.getcwd(), 'data', 'simple.pkl')):
+            data = data_from_name(args.dataset, orthogonal_project=args.orthogonal_projection)
+        else:
+            data = pd.read_pickle(os.path.join(os.getcwd(), 'data', 'simple.pkl'))
     elif args.dataset == "isolated_repressilator":
-        if not os.path.isfile(os.path.join(os.getcwd(), 'data', 'duffing_oscillator_{}_{}_{}_{}.pkl'.format(args.num_combinations, args.num_samples, args.time_steps, args.max_time))):
+        if not os.path.isfile(os.path.join(os.getcwd(), 'data', 'isolated_repressilator_{}_{}_{}_{}.pkl'.format(args.num_combinations, args.num_samples, args.time_steps, args.max_time))):
             data = data_from_name(args.dataset,combi_n = args.num_combinations, combi_n_samples = args.num_samples, time_points = args.time_steps, time_intervals = args.max_time)
         else:
-            data = pd.read_pickle(os.path.join(os.getcwd(), 'data', 'duffing_oscillator_{}_{}_{}_{}.pkl'.format(args.num_combinations, args.num_samples, args.time_steps, args.max_time)))
+            data = pd.read_pickle(os.path.join(os.getcwd(), 'data', 'isolated_repressilator_{}_{}_{}_{}.pkl'.format(args.num_combinations, args.num_samples, args.time_steps, args.max_time)))
     elif args.dataset == "duffing_oscillator":
         if not os.path.isfile(os.path.join(os.getcwd(), 'data', 'duffing_oscillator_{}_{}_{}_{}.pkl'.format(args.num_combinations, args.num_samples, args.time_steps, args.max_time))):
             data = data_from_name(args.dataset,combi_n = args.num_combinations, combi_n_samples = args.num_samples, time_points = args.time_steps, time_intervals = args.max_time)
@@ -70,7 +76,9 @@ def data_preprocessing(args):
         Xtrain, Xtrain_clean = torch.from_numpy(Xtrain).float().contiguous(), torch.from_numpy(Xtrain_clean).float().contiguous()
         Xtest, Xtest_clean = torch.from_numpy(Xtest).float().contiguous(), torch.from_numpy(Xtest_clean).float().contiguous()
     else:
+        print('Other dataset')
         X = discrete_data_format(data)
+        print('the shape of the data is: ', X.shape)
         X = X.reshape(X.shape[0]*X.shape[1], X.shape[2])
         X = add_channels(X)
         Xtrain, Xtest = train_test(X, percent = args.train_size)
@@ -78,7 +86,7 @@ def data_preprocessing(args):
         Xtest_clean = Xtest.clone()
         # rescalling the data
         Xtrain, Xtest = rescale(Xtrain,Xtest)
-        Xtrain_clean, Xtest_clean = rescale(Xtrain_clean,Xtest_clean)
+        Xtrain_clean, Xtest_clean = rescale(Xtrain_clean,Xtest_clean)   
         m, n = X.shape[2], X.shape[3]
 
     return Xtrain, Xtest, Xtrain_clean, Xtest_clean, m, n
@@ -98,7 +106,7 @@ def create_dataloader(args, Xtrain, Xtest):
             else:
                 trainDat.append(Xtrain[start:-i].float())
             start += 1
-
+        
         train_data = torch.utils.data.TensorDataset(*trainDat)
         del(trainDat)
 
@@ -124,9 +132,9 @@ def create_dataloader(args, Xtrain, Xtest):
 
     else:
         trainDat = [torch.empty(0) for _ in range(args.steps + 1)]
-
         for i in range(int(len(Xtrain)/args.time_steps)):
-            traj = Xtrain[i*args.time_steps : (i+1)*args.time_steps-1].float()
+            
+            traj = Xtrain[i*args.time_steps : (i+1)*args.time_steps].float()
             start = 0
             for j in np.arange(args.steps,-1, -1):
                 if j == 0:
@@ -134,7 +142,7 @@ def create_dataloader(args, Xtrain, Xtest):
                 else:
                     trainDat[j] = torch.cat((trainDat[j], traj[start:-j].float()), dim=0)
                 start += 1
-
+        print(trainDat[0].shape)
         train_data = torch.utils.data.TensorDataset(*trainDat)
         del(trainDat)
 
@@ -143,9 +151,9 @@ def create_dataloader(args, Xtrain, Xtest):
                                 shuffle = True)
 
         testDat = [torch.empty(0) for _ in range(args.steps + 1)]
-
+        
         for i in range(int(len(Xtest)/args.time_steps)):
-            traj = Xtest[i*args.time_steps : (i+1)*args.time_steps-1].float()
+            traj = Xtest[i*args.time_steps : (i+1)*args.time_steps].float()
             start = 0
             for j in np.arange(args.steps,-1, -1):
                 if j == 0:
@@ -231,6 +239,7 @@ class Trainer:
         self.optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
         # Loss function
+        #self.criterion = nn.L1Loss().to(device)
         self.criterion = nn.MSELoss().to(device)
 
     # scheduler
@@ -252,21 +261,41 @@ class Trainer:
         forward_loss = []
         recon_loss = []
 
+        ES = EarlyStopping(patience=10, min_delta=0.00001)
+
+        
         for epoch in range(self.num_epochs):
             #print(epoch)
             for batch_idx, data_list in enumerate(self.train_loader):
+                
+
                 self.model.train()
+                
                 out, out_back = self.model(data_list[0].to(self.device), mode='forward')
 
+                
+                #loss_fwd = sum(
+                #self.criterion(out[k], data_list[k+1].to(self.device))
+                #for k in range(self.steps))
 
                 for k in range(self.steps):
                     if k == 0:
                         loss_fwd = self.criterion(out[k], data_list[k+1].to(self.device))
                     else:
                         loss_fwd += self.criterion(out[k], data_list[k+1].to(self.device))
-
                 
                 loss_identity = self.criterion(out[-1], data_list[0].to(self.device)) * self.steps
+
+                # linearization loss
+                x = data_list[0].to(self.device)
+                q = self.model.encoder(x)
+                qhat = self.model.dynamics(q)
+                y = data_list[1].to(self.device)
+                yhat = self.model.encoder(y)
+
+                loss_linear = self.criterion(qhat, yhat)*self.steps
+
+
 
                 loss_bwd = 0.0
                 loss_consist = 0.0
@@ -275,7 +304,7 @@ class Trainer:
                 loss_consist = 0.0
 
                 if self.backward == 1:
-                    out, out_back = self.model(data_list[-1].to(self.device), mode='self.backward')
+                    out, out_back = self.model(data_list[-1].to(self.device), mode='backward')
     
 
                     for k in range(self.steps_back):
@@ -305,11 +334,11 @@ class Trainer:
                         else:
                             loss_consist += (torch.sum((torch.mm(Bs1, As1) - Ik)**2) + \
                                             torch.sum((torch.mm(As2, Bs2)-  Ik)**2) ) / (2.0*k) 
-                    #Ik = torch.eye(K).float().to(device)
-                    #loss_consist = (torch.sum( (torch.mm(A, B)-Ik )**2)**1 + \
-                    #torch.sum( (torch.mm(B, A)-Ik)**2)**1 )
+
+
+                #spectral_reg = torch.norm(torch.exp(self.model.dynamics.dynamics), p=2)
     
-                loss = loss_fwd + self.lamb * loss_identity +  self.nu * loss_bwd + self.eta * loss_consist
+                loss =   5 * loss_fwd + self.lamb * loss_identity +  self.nu * loss_bwd + self.eta * loss_consist +  loss_linear 
 
                 # ===================self.backward====================
                 self.optimizer.zero_grad()
@@ -323,6 +352,14 @@ class Trainer:
             epoch_loss.append(epoch)
             forward_loss.append(loss_fwd.item())
             recon_loss.append(loss_identity.item())
+
+            if self.early_stopping:
+                val_loss = self.evaluate_prediction()
+                ES(val_loss)
+                if ES.early_stop:
+                    print("Early stopping triggered at epoch ", epoch)
+                    self.ES_epochs = epoch
+                    break
             
             
             if (epoch) % 20 == 0:
@@ -336,10 +373,14 @@ class Trainer:
                     print("loss sum: ", loss.item())
 
                     epoch_hist.append(epoch+1) 
-
+                    
+                    #print(self.model.dynamics.dynamics)
+                    print(self.model.dynamics.dynamics.weight)
+                    
                     if hasattr(self.model.dynamics, 'dynamics'):
                         w, _ = np.linalg.eig(self.model.dynamics.dynamics.weight.data.cpu().numpy())
                         print(np.abs(w))
+                    
 
 
         if self.backward == 1:
@@ -369,7 +410,7 @@ class Trainer:
         epoch_loss = []
         validation_losses = []
 
-        ES = EarlyStopping(patience=5, min_delta=0.001)
+        ES = EarlyStopping(patience=10, min_delta=0.001)
 
         for epoch in range(self.num_epochs):
             for batch_idx, data_list in enumerate(self.train_loader):

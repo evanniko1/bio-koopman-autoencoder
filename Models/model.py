@@ -12,6 +12,8 @@ class encoderNet(nn.Module):
         super(encoderNet, self).__init__()
         self.N = m * n
         self.tanh = nn.Tanh()
+
+
         
         self.layers = nn.ModuleList()
         
@@ -19,6 +21,7 @@ class encoderNet(nn.Module):
         for _ in range(hidden):
             self.layers.append(nn.Linear(16*ALPHA, 16*ALPHA))
         self.layers.append(nn.Linear(16*ALPHA, b))
+
         
         # Weight initialization
         for m in self.modules():
@@ -30,10 +33,10 @@ class encoderNet(nn.Module):
     def forward(self, x):
         x = x.view(-1, 1, self.N)
         
-        for layer in self.layers[:-1]:
+        for layer in self.layers:
             x = self.tanh(layer(x))
 
-        x = self.layers[-1](x)
+
         
         return x
 
@@ -45,6 +48,7 @@ class decoderNet(nn.Module):
         self.b = b
         self.tanh = nn.Tanh()
         
+
         self.layers = nn.ModuleList()
         
         self.layers.append(nn.Linear(b, 16*ALPHA))
@@ -61,11 +65,12 @@ class decoderNet(nn.Module):
 
     def forward(self, x):
         x = x.view(-1, 1, self.b)
-        for layer in self.layers:
+        for layer in self.layers[:-1]:
             x = self.tanh(layer(x))  
+        x = self.layers[-1](x)
         x = x.view(-1, 1, self.m, self.n)
-        return x
 
+        return x
 
 
 class dynamics(nn.Module):

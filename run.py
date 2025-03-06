@@ -1,4 +1,5 @@
 import argparse
+import json
 
 import pandas as pd
 import numpy as np
@@ -18,6 +19,10 @@ from utils.Viz import *
 from utils.config_args import *
 
 import os
+####
+import torch.multiprocessing as mp
+####
+mp.set_start_method('spawn')
 
 torch.use_deterministic_algorithms(False)
 #==============================================================================
@@ -31,6 +36,8 @@ torch.cuda.manual_seed(args.seed)
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 set_seed(args.seed)
+
+# device is cuda else cpu
 device = get_device()
 
 #******************************************************************************
@@ -44,11 +51,18 @@ folder_path = os.path.join(experiment_folder, args.folder)
 if not os.path.isdir(folder_path):
     os.mkdir(folder_path)
 
+#******************************************************************************
+# save arguments in json file
+#******************************************************************************
+args_dict = vars(args)
+with open(os.path.join(folder_path, 'args.json'), 'w') as f:
+    json.dump(args_dict, f)
+    
 
 #==============================================================================
 # Dataset
 #==============================================================================
-Xtrain, Xtest, Xtrain_clean, Xtest_clean, m, n = data_preprocessing(args)
+Xtrain, Xtest, Xtrain_clean, Xtest_clean, m, n= data_preprocessing(args)
 
 train_loader, test_loader = create_dataloader(args, Xtrain, Xtest)
 
@@ -111,6 +125,12 @@ elif args.policy == 'Custom':
 # Visualization
 #==============================================================================
 
-plot_trajectory(model, Xtest, device,folder=folder_path, t= 1,traj_steps = args.time_steps)
-swarm_plot(model, Xtest, device,folder=folder_path, t=100)
+if args.policy == 'AE':
+    plot_recon_trajectory(model, Xtest, device,folder=folder_path, num_trajectories=10, traj_steps = args.time_steps)
+    violin_plot(model, Xtest, device,folder=folder_path)
+else:
+    print('Plotting prediction')
+    plot_combined_trajectory(model, Xtrain, device, folder=folder_path, num_trajectories=2,prediction_steps = 50,traj_steps = args.time_steps)
+
+
 

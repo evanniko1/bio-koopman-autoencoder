@@ -1,3 +1,4 @@
+import json
 import os
 import optuna
 
@@ -47,6 +48,8 @@ torch.cuda.manual_seed(args.seed)
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 set_seed(args.seed)
+
+# device is cuda else cpu
 device = get_device()
 
 #******************************************************************************
@@ -55,6 +58,9 @@ device = get_device()
 if not os.path.isdir(args.folder):
     os.mkdir(args.folder)
 
+# save configuration in json file
+with open(f'{args.folder}/config.json', 'w') as f:
+    json.dump(args.__dict__, f, indent=2)
 #==============================================================================
 # Dataset
 #==============================================================================
@@ -97,11 +103,11 @@ def objective(trial):
     # Update parameters based on trial suggestions
     for opt_param in args.opt_params:
         if opt_param == 'lr':
-            args.lr = trial.suggest_loguniform("lr", 1e-5, 1e-2)
+            args.lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
         elif opt_param == 'batch':
             args.batch = trial.suggest_categorical('batch', batch_range)
         elif opt_param == 'steps':
-            args.steps = trial.suggest_categorical('steps', steps_range)
+            args.steps = trial.suggest_int('steps', 10, 50)
         elif opt_param == 'steps_back':
             args.steps_back = trial.suggest_categorical('steps_back', steps_back_range)
         elif opt_param == 'gradclip':
@@ -110,19 +116,24 @@ def objective(trial):
             args.degree = trial.suggest_int('degree', 2, 10)
         elif opt_param == 'alpha':
             # the depth of the network
-            args.alpha = trial.suggest_loguniform('alpha', 0.5, 64)
+            args.alpha = trial.suggest_int('alpha', 1, 20)
         elif opt_param == 'hidden':
             # the number of hidden layers
             args.hidden = trial.suggest_int('hidden', 0, 50,5)
         elif opt_param == 'bottleneck':
             # the size of the bottleneck layer
-            args.bottleneck = trial.suggest_int('bottleneck', 1, 20)
+            args.bottleneck = trial.suggest_int('bottleneck', 4, 32)
         elif opt_param == 'lamb':
             args.lamb = trial.suggest_categorical('lamb', lambda_range)
         elif opt_param == 'spline_knots':
             args.spline_knots = trial.suggest_int('spline_knots', 2, 12)
         else:
             raise ValueError(f'Unknown optimization parameter: {opt_param}')
+    
+    # Create dataloaders
+    Xtrain, Xtest, Xtrain_clean, Xtest_clean, m, n = data_preprocessing(args)
+
+    train_loader, test_loader = create_dataloader(args, Xtrain, Xtest)
 
     # Create model
     model_map = {
@@ -144,6 +155,9 @@ def objective(trial):
     
     return trainer.evaluate_reconstruction(), trainer.evaluate_prediction()
 
+# make device cpu
+device = get_device()
+
 #================================================================================
 # Optimize
 #================================================================================
@@ -153,17 +167,27 @@ study = optuna.create_study(
     sampler=optuna.samplers.TPESampler(seed=args.seed),
     pruner=optuna.pruners.MedianPruner(),
 )
-study.optimize(objective, n_trials=args.num_trials)
+study.optimize(objective, n_trials=args.num_trials,n_jobs=5)
 
-print(f'The best parameters are: {study.best_params}')
+print(f'The best parameters are: {study.best_trials}')
+
+pareto_trials = study.best_trials
+
+best_trial_reconstruction = min(pareto_trials, key=lambda trial: trial.values[0])
+best_trial_prediction = min(pareto_trials, key=lambda trial: trial.values[1])
+
+print(f'The best trial for reconstruction is: {best_trial_reconstruction}')
+print(f'The best trial for prediction is: {best_trial_prediction}')
 
 
 # save image
-fig1 = optuna.visualization.plot_param_importances(study)
-fig2 = optuna.visualization.plot_slice(study)
-fig3 = optuna.visualization.plot_pareto_front(study)
+fig1_1 = optuna.visualization.plot_param_importances(study,target=lambda t: t.values[0], target_name="Reconstruction")
+fig1_2 = optuna.visualization.plot_param_importances(study,target=lambda t: t.values[1], target_name="Prediction")
+fig2 = optuna.visualization.plot_slice(study,target=lambda t: t.values[1], target_name="Prediction")
+fig3 = optuna.visualization.plot_pareto_front(study,target_names=["Reconstruction","Prediction"])
 
-fig1.write_image(f'{args.folder}/param_importances.png')
+fig1_1.write_image(f'{args.folder}/param_importances_reconstruction.png')
+fig1_2.write_image(f'{args.folder}/param_importances_prediction.png')
 fig2.write_image(f'{args.folder}/slice.png')
 fig3.write_image(f'{args.folder}/pareto_front.png')
 
