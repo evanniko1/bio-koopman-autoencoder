@@ -34,6 +34,7 @@ class polyKANLayer(nn.Module):
             self.register_buffer("arange", torch.arange(0, degree + 1, 1))
 
     def forward(self, x):
+        original_shape = x.shape[:-1]
         x = x.view(-1, self.input_dim)
         x = torch.tanh(x)
 
@@ -93,9 +94,9 @@ class polyKANLayer(nn.Module):
                 for n in range(2, self.degree + 1):
                     poly[:, :, n] = ((2 * (n-1) + 1) / n) * x * poly[:, :, n-1].clone() - ((n-1) / n) * poly[:, :, n-2].clone()
             x = poly
-
+        
         y = torch.einsum('bid,iod->bo', x, self.coeffs)
-        return y.view(-1, self.output_dim)
+        return y.view(*original_shape, self.output_dim)
             
 def combine_layers(layers, method='sum', weights=None, dim=0):
     """

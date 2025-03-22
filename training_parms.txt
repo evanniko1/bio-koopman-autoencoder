@@ -1,6 +1,25 @@
 # Command lines to test code and avoid multiple copy-pasting
 
-# The objective of the examples is to benchmark and baseline the code with specific parameter values. Train size unless otherwise documented is set to 50% and epochs are set to 250 for fast iterations.
+# The objective of the examples is to benchmark and baseline the code with specific parameter values. Train size unless otherwise documented is set to 80% and epochs are set to 100 for fast iterations.
+
+####################################
+# Examples with only mlp 
+
+# simple system using KAN 
+python run_experiment.py --dataset simple --folder simple --epochs 100 --bottleneck 3 --decoder_loss_weight 1e-1 --lr 1e-2 --network_type KAN --encoder_hidden_layers 50 50
+
+# Discrete Spectrum
+python run_experiment.py --dataset discrete_spectrum --folder discrete_spectrum --epochs 100 --bottleneck 3 --decoder_loss_weight 1 
+
+# isolated repressilator
+python run_experiment.py  --dataset isolated_repressilator --folder isolated_repressilator --time_steps 101 --prediction_length 100  --max_time 20 --bottleneck 32 --decoder_loss_weight 1
+
+# duffing oscillator
+python run_experiment.py  --dataset duffing_oscillator --folder duffing_oscillator --time_steps 101 --prediction_length 100  --max_time 10 --bottleneck 64 --decoder_loss_weight 1
+
+# optimization for lr and batch for discrete_spectrum
+
+
 
 ####################################
 # Example isolated repressilator
@@ -63,13 +82,3 @@
 # HOST-AWARE
 python3 driver_upd.py --alpha 2 --model koopmanAE --dataset host_aware_repressilator --lr 1e-3 --epochs 10 --batch 128 --folder host_aware_repr_mlp --bottleneck 6 --backward 0 --pred_steps 2 --seed 7
 
-#simple dynamics
-python3 run.py --alpha 3 --model koopmanAE  --dataset simple  --num_combinations 1 --num_samples 5000 --max_time 30 --time_steps 100 --lr 1e-3 --epochs 100 --batch 64 --folder simple --bottleneck 6  --pred_steps 100 --seed 7 --steps 20  --policy 
-KoopmanAE 
-
-
-###########
-# new script
-python3 run.py --alpha 2 --model koopmanAE  --dataset duffing_oscillator --lr 1e-3 --epochs 150 --batch 128 --folder isolated_duffing --bottleneck 6 --backward 0 --pred_steps 100 --seed 7 --policy AE
-
-# optimization
