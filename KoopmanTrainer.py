@@ -69,7 +69,7 @@ class Trainer:
 
     def _evolve(self, Y0) -> torch.Tensor:
         Ypred = torch.zeros(Y0.shape[0], self.prediction_length, Y0.shape[1], device=self.device)
-        Ypred[:, 0, :] = Y0
+        Ypred[:, 0, :] = self.model.knet(Y0.clone())
         for index in range(1, Ypred.shape[1]):
             Ypred[:, index] = self.model.knet(Ypred[:, index-1].clone())
         return Ypred
