@@ -154,7 +154,7 @@ trainer.train_KoopmanAE()
 #==============================================================================
 # Get a test sample
 
-traj = preprocessed_data["Xtest"][4].to(device)  # Get first trajectory from batch
+traj = preprocessed_data["Xtest"][8].to(device)  # Get first trajectory from batch
 
 # Get reconstructed trajectory
 model.eval()

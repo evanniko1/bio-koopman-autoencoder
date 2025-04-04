@@ -6,18 +6,18 @@
 # Examples with only mlp 
 
 # simple system using KAN 
-python run_experiment.py --dataset simple --folder simple --epochs 100 --bottleneck 3 --decoder_loss_weight 1e-1 --lr 1e-2 --network_type KAN --encoder_hidden_layers 50 50
+python run_experiment.py --dataset simple --folder simple_KAN --epochs 100 --bottleneck 3 --decoder_loss_weight 100 --lr 1e-2 --network_type KAN --encoder_hidden_layers 50 50 --prediction_length 5
 
 # Discrete Spectrum
 python run_experiment.py --dataset discrete_spectrum --folder discrete_spectrum --epochs 100 --bottleneck 3 --decoder_loss_weight 1 
 
 # isolated repressilator
 python run_experiment.py  --dataset isolated_repressilator --folder isolated_repressilator --time_steps 101 --prediction_length 100  --max_time 20 --bottleneck 32 --decoder_loss_weight 1
-
+`
 # duffing oscillator
 python run_experiment.py  --dataset duffing_oscillator --folder duffing_oscillator --time_steps 101 --prediction_length 100  --max_time 10 --bottleneck 64 --decoder_loss_weight 1
 
-# optimization for lr and batch for discrete_spectrum
+# optimization for lr and batch for discrete_spectrum`
 
 
 

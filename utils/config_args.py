@@ -25,10 +25,13 @@ def get_args():
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--lr_update', type=int, nargs='+', default=[30, 90, 120, 180], help='decrease learning rate at these epochs')
-    parser.add_argument('--lr_decay', type=float, default=0.2, help='learning rate decay factor')
+    parser.add_argument('--lr_decay', type=float, default=0.8, help='learning rate decay factor')
     parser.add_argument('--gradclip', type=float, default=0.05, help='gradient clipping threshold')
     parser.add_argument('--decoder_loss_weight', type=float, default=1e-2, help='weight for decoder reconstruction loss')
+    parser.add_argument('--unitary_loss_weight', type=float, default=1e-1, help='weight for unitary loss')
     parser.add_argument('--early_stopping', type=bool, default=False, help='use early stopping')
+    parser.add_argument('--loss_function', type=str, default='mse', help='loss function to use (mse, or relative_mse)')
+
     
     # Autoencoder configuration
     parser.add_argument('--bottleneck', type=int, default=50, help='size of bottleneck layer in autoencoder')

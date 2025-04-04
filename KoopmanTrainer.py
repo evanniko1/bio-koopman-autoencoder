@@ -32,6 +32,17 @@ class EarlyStopping:
                 print("Early stopping triggered.")
                 self.early_stop = True
 
+# relative mse loss function
+class RelativeMSELoss(nn.Module):
+    def __init__(self, epsilon=1e-8):
+        super(RelativeMSELoss, self).__init__()
+        self.epsilon = epsilon
+
+    def forward(self, y_pred, y_true):
+        numerator = torch.mean((y_true - y_pred) ** 2)
+        denominator = torch.mean(y_true ** 2) + self.epsilon
+        return numerator / denominator
+    
 class Trainer:
     def __init__(self, model, args, device,do_eval, train_loader, val_loader):
         self.args = args
@@ -51,13 +62,19 @@ class Trainer:
         self.do_eval = do_eval
         self.prediction_length = args.prediction_length
 
+        # losses 
+        self.decoder_loss_weight = args.decoder_loss_weight if hasattr(args, 'decoder_loss_weight') else 1e-2
+        self.loss_function = args.loss_function if hasattr(args, 'loss_function') else 'mse'
+        self.unitary_loss_weight = args.unitary_loss_weight if hasattr(args, 'unitary_loss_weight') else 1e-2
+
         self.train_loader = train_loader
         self.val_loader = val_loader
 
         self.optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
-        self.criterion = nn.MSELoss().to(device)
-        
-        
+        if self.loss_function == 'mse':
+            self.criterion = nn.MSELoss()
+        elif self.loss_function == 'relative_mse':
+            self.criterion = RelativeMSELoss()
 
     def lr_scheduler(self, optimizer, epoch, lr_decay_rate=0.8, decayEpoch=[]):
         if epoch in decayEpoch:
@@ -76,7 +93,6 @@ class Trainer:
 
     def train_KoopmanAE(self):
         
-        decoder_loss_weight = self.args.decoder_loss_weight if hasattr(self.args, 'decoder_loss_weight') else 1e-2
         clip_grad_norm = self.args.gradclip if self.gradclip else None
 
         self.parameters = list(self.model.ae.parameters()) + list(self.model.knet.parameters())
@@ -98,6 +114,7 @@ class Trainer:
             pred_loss_tr = 0
             total_loss_tr = 0
             num_batches = 0
+            unitary_loss_tr = 0
 
             for batch_idx, data_list in enumerate(self.train_loader):
                 self.optimizer.zero_grad()
@@ -110,7 +127,13 @@ class Trainer:
                 recon_loss = self.criterion(Xrtr, data)
                 pred_loss = self.criterion(Xpredtr, data[:, 1:,:])
                 lin_loss = self.criterion(Ypredtr, Ytr[:, 1:, :])
-                total_loss = lin_loss + decoder_loss_weight * (recon_loss + pred_loss)
+                # add the unitary loss on the koopman operator
+                # Unitary loss normalized by matrix size
+                K = self.model.knet.net.weight
+                K_T = torch.conj(K.T)
+                n = K.shape[0]
+                unitary_loss = torch.norm(K @ K_T - torch.eye(n, device=self.device), p='fro') / (n * n)
+                total_loss = lin_loss + self.decoder_loss_weight * (recon_loss + pred_loss) + self.unitary_loss_weight * unitary_loss
 
                 total_loss.backward()
                 if clip_grad_norm:
@@ -121,11 +144,13 @@ class Trainer:
                 lin_loss_tr += lin_loss.item()
                 pred_loss_tr += pred_loss.item()
                 total_loss_tr += total_loss.item()
+                unitary_loss_tr += unitary_loss
                 num_batches += 1
 
             recon_loss_tr /= num_batches
             lin_loss_tr /= num_batches
             pred_loss_tr /= num_batches
+            unitary_loss_tr /= num_batches
             total_loss_tr /= num_batches
 
             stats['recon_loss_tr'].append(recon_loss_tr)
@@ -144,6 +169,7 @@ class Trainer:
                     pred_loss_va = 0
                     total_loss_va = 0
                     num_val_batches = 0
+                    unitary_loss_va = 0
 
                     for batch_idx, data_list in enumerate(self.val_loader):
                         data = data_list[0].to(self.device)
@@ -154,17 +180,19 @@ class Trainer:
                         recon_loss = self.criterion(Xrva, data) 
                         pred_loss = self.criterion(Xpredva, data[:, 1:,:])
                         lin_loss = self.criterion(Ypredva, Yva[:, 1:, :])
-                        total_loss = lin_loss + decoder_loss_weight * (recon_loss + pred_loss)
+                        total_loss = lin_loss + self.decoder_loss_weight * (recon_loss + pred_loss)
 
                         recon_loss_va += recon_loss.item()
                         lin_loss_va += lin_loss.item()
                         pred_loss_va += pred_loss.item()
+                        unitary_loss_va += unitary_loss.item()
                         total_loss_va += total_loss.item()
                         num_val_batches += 1
 
                     recon_loss_va /= num_val_batches
                     lin_loss_va /= num_val_batches
                     pred_loss_va /= num_val_batches
+                    unitary_loss_va /= num_val_batches
                     total_loss_va /= num_val_batches
 
                     stats['recon_loss_va'].append(recon_loss_va)
@@ -181,9 +209,9 @@ class Trainer:
 
             if (epoch + 1) % 20 == 0:
                 print(f"Epoch {epoch+1}/{self.num_epochs}")
-                print(f"Training - Recon Loss: {recon_loss_tr:.6e}, Linear Loss: {lin_loss_tr:.6e}, Pred Loss: {pred_loss_tr:.6e}, Total Loss: {total_loss_tr:.6e}")
+                print(f"Training - Recon Loss: {recon_loss_tr:.6e}, Linear Loss: {lin_loss_tr:.6e}, Pred Loss: {pred_loss_tr:.6e}, Unitary Loss: {unitary_loss_tr:.6e}, Total Loss: {total_loss_tr:.6e}")
                 if do_val:
-                    print(f"Validation - Recon Loss: {recon_loss_va:.6e}, Linear Loss: {lin_loss_va:.6e}, Pred Loss: {pred_loss_va:.6e}, Total Loss: {total_loss_va:.6e}")
+                    print(f"Validation - Recon Loss: {recon_loss_va:.6e}, Linear Loss: {lin_loss_va:.6e}, Pred Loss: {pred_loss_va:.6e},Unitary Loss: {unitary_loss_va:.6e}, Total Loss: {total_loss_va:.6e}")
 
         if self.save:
             self.visualize(stats['recon_loss_tr'], 'Reconstruction', stats.get('recon_loss_va'))
@@ -295,6 +323,7 @@ class Trainer:
 
 
         for epoch in tqdm(range(self.num_epochs), desc="Training Epochs"):
+            pred_loss_tr = 0
             for batch_idx, data_list in enumerate(self.train_loader):
                 self.optimizer.zero_grad()
                 data = data_list[0].to(self.device)
@@ -304,6 +333,7 @@ class Trainer:
                 pred_loss = self.criterion(Xpredtr, data[:, 1:,:])
                 pred_loss.backward()
                 self.optimizer.step()
+                pred_loss_tr += pred_loss.item()
 
             pred_loss_tr /= len(self.train_loader)
             stats['pred_loss_tr'].append(pred_loss_tr)
