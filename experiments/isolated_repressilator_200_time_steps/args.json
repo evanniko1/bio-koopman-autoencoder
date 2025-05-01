@@ -25,11 +25,11 @@
   ],
   "lr_decay": 0.8,
   "gradclip": 0.05,
-  "decoder_loss_weight": 10,
-  "unitary_loss_weight": 1,
+  "decoder_loss_weight": 4,
+  "unitary_loss_weight": 6,
   "early_stopping": false,
   "loss_function": "mse",
-  "bottleneck": 32,
+  "bottleneck": 64,
   "encoder_hidden_layers": [
     100,
     100

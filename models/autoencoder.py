@@ -35,7 +35,7 @@ class MLP(torch.nn.Module):
             if i != len(layers)-2: #all layers except last
                 if batch_norm:
                     self.net.append(torch.nn.BatchNorm1d(layers[i+1]))
-                self.net.append(torch.nn.ReLU())
+                self.net.append(torch.nn.LeakyReLU())
 
     def forward(self, X) -> torch.Tensor:
         """Forward propagation of neural net.
@@ -83,12 +83,16 @@ class AutoEncoder(torch.nn.Module):
 
         # Select network type for encoder
         if network_type == 'MLP':
-            self.encoder = MLP(
+            
+            self.encoder = nn.Sequential(
+                MLP(
                 input_size=input_size,
                 output_size=encoded_size,
                 hidden_sizes=encoder_hidden_layers,
                 batch_norm=batch_norm
-            )
+            ),
+                torch.nn.Dropout(p=0.3)
+            )            
             self.decoder = MLP(
                 input_size=encoded_size,
                 output_size=input_size,

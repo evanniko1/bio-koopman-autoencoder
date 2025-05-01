@@ -1,0 +1,5 @@
+{
+  "encoder_size": 50,
+  "encoder_depth": 1,
+  "bottleneck": 90
+}

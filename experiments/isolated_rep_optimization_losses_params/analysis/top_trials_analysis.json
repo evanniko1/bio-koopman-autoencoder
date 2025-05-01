@@ -1,0 +1,44 @@
+{
+  "reconstruction": {
+    "top_trials": [
+      11,
+      17,
+      12
+    ],
+    "parameters": [
+      {
+        "decoder_loss_weight": 6.6,
+        "unitarity_loss_weight": 5.6
+      },
+      {
+        "decoder_loss_weight": 8.6,
+        "unitarity_loss_weight": 5.6
+      },
+      {
+        "decoder_loss_weight": 7.6,
+        "unitarity_loss_weight": 3.6
+      }
+    ]
+  },
+  "prediction": {
+    "top_trials": [
+      13,
+      11,
+      5
+    ],
+    "parameters": [
+      {
+        "decoder_loss_weight": 7.1,
+        "unitarity_loss_weight": 3.6
+      },
+      {
+        "decoder_loss_weight": 6.6,
+        "unitarity_loss_weight": 5.6
+      },
+      {
+        "decoder_loss_weight": 4.1,
+        "unitarity_loss_weight": 6.6
+      }
+    ]
+  }
+}

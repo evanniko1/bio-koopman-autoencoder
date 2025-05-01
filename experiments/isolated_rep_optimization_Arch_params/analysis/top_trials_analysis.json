@@ -1,0 +1,50 @@
+{
+  "reconstruction": {
+    "top_trials": [
+      9,
+      19,
+      17
+    ],
+    "parameters": [
+      {
+        "encoder_size": 50,
+        "encoder_depth": 1,
+        "bottleneck": 90
+      },
+      {
+        "encoder_size": 50,
+        "encoder_depth": 1,
+        "bottleneck": 90
+      },
+      {
+        "encoder_size": 200,
+        "encoder_depth": 1,
+        "bottleneck": 100
+      }
+    ]
+  },
+  "prediction": {
+    "top_trials": [
+      18,
+      8,
+      10
+    ],
+    "parameters": [
+      {
+        "encoder_size": 200,
+        "encoder_depth": 3,
+        "bottleneck": 80
+      },
+      {
+        "encoder_size": 200,
+        "encoder_depth": 4,
+        "bottleneck": 10
+      },
+      {
+        "encoder_size": 100,
+        "encoder_depth": 3,
+        "bottleneck": 40
+      }
+    ]
+  }
+}
