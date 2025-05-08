@@ -38,6 +38,8 @@ def get_args():
     parser.add_argument('--encoder_hidden_layers', type=int,nargs="+", default=[100, 100], help='Number of units in each hidden layer of encoder')
     parser.add_argument('--decoder_hidden_layers', type=int,nargs="+", default=None, help='number of hidden layers in decoder')
     parser.add_argument('--network_type', type=str, default='MLP', help='type of network to use: "MLP", "KAN", or "PolyKan"')
+    # additional parameter for the AFT 
+    parser.add_argument('--context_length', type=int, default=10, help='length of context for AFT')
     # KAN configuration (if using KAN models)
     parser.add_argument('--basis_function', type=str, default='chebyshev', help='basis function type for KANs')
     parser.add_argument('--degree', type=int, default=4, help='degree for polynomial basis')
