@@ -28,6 +28,7 @@ class KoopmanDataHandler:
         self.device = config.get("device", torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         self.prediction_length = config.get("prediction_length", 10)
         self.stride = config.get("stride", None)
+        self.data_parameters = config.get("data_parameters", None)
         
         # Initialize data attributes
         self.raw_data = None
@@ -42,7 +43,7 @@ class KoopmanDataHandler:
         elif self.dataset_name == "simple":
             filename = 'simple.pkl'
         elif self.dataset_name == "isolated_repressilator":
-            filename = f'isolated_repressilator_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}.pkl'
+            filename = f'isolated_repressilator_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
         elif self.dataset_name == "duffing_oscillator":
             filename = f'duffing_oscillator_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}.pkl'
         elif self.dataset_name == "host_aware_repressilator":
@@ -84,7 +85,8 @@ class KoopmanDataHandler:
                     "combi_n": self.num_combinations,
                     "combi_n_samples": self.num_samples,
                     "time_points": self.time_steps,
-                    "time_intervals": self.max_time
+                    "time_intervals": self.max_time,
+                    "data_parameters": self.data_parameters
                 }
             data = data_from_name(self.dataset_name, orthogonal_project=self.orthogonal_projection, **kwargs)
 
@@ -149,6 +151,14 @@ class KoopmanDataHandler:
             Xtrain = (Xtrain - self.Xmin) / (self.Xmax - self.Xmin)
             Xval = (Xval - self.Xmin) / (self.Xmax - self.Xmin)
             Xtest = (Xtest - self.Xmin) / (self.Xmax - self.Xmin)
+        elif self.normalize == 'max_per_dim':
+            print(f" shape of Xtrain is {Xtrain.shape}")
+            # Flatten all but last dimension, then take max per feature
+            self.Xscale = torch.amax(Xtrain, dim=(0, 1))
+            print(f"Xmax: {self.Xscale}")
+            Xtrain = Xtrain / self.Xscale
+            Xval = Xval / self.Xscale
+            Xtest = Xtest / self.Xscale
         
         print(f'Processed data shapes - Train: {Xtrain.shape}, Val: {Xval.shape}, Test: {Xtest.shape}')
         

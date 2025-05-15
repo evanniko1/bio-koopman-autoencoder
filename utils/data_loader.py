@@ -15,7 +15,7 @@ import torch
 #******************************************************************************
 # Read in data util functions
 #******************************************************************************
-def data_from_name(name, combi_n = 1, combi_n_samples = 5000, time_points = 50, time_intervals = 10, noise = 0.0, theta=2.4, orthogonal_project=False,path = 'data/'):
+def data_from_name(name, combi_n = 1, combi_n_samples = 5000, time_points = 50, time_intervals = 10, noise = 0.0, theta=2.4,data_parameters=[0.03, 10, 40, 2, 0.3466, 0.1933, 10], orthogonal_project=False,path = 'data/'):
     """
     Retrieve dataset based on the provided name.
 
@@ -80,7 +80,7 @@ def data_from_name(name, combi_n = 1, combi_n_samples = 5000, time_points = 50, 
         seed = 42
         return DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed, path=path)
     elif name == "isolated_repressilator":
-        return isolated_repressilator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals, path=path)
+        return isolated_repressilator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
     elif name == "duffing_oscillator":
         return duffing_oscillator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals, path=path)
     else:
@@ -315,6 +315,7 @@ def DiscreteSpectrumExampleFn(x1range, x2range, numICs, tSpan, mu, lamda, seed, 
 #******************************************************************************
 # Isolated Repressilator
 #******************************************************************************
+# Repressilator model
 class RepressilatorModel():
     """
     The "Repressilator" model describes oscillations in a network of proteins
@@ -377,40 +378,47 @@ class RepressilatorModel():
             if np.any(self._y0 < 0):
                 raise ValueError('Initial states can not be negative.')
 
+
+
     def n_outputs(self):
         return 6
+
 
     def n_parameters(self):
         return 4
 
-    def _rhs(self, y, t, alpha_0, alpha, beta, n):
+
+
+    def _rhs(self, y, t, alpha0, alpha, K, n, delta_m, delta_p, beta):
         """
         Calculates the model RHS.
         """
         dy = np.zeros(6)
-        dy[0] = -y[0] + alpha / (1 + y[5]**n) + alpha_0
-        dy[1] = -y[1] + alpha / (1 + y[3]**n) + alpha_0
-        dy[2] = -y[2] + alpha / (1 + y[4]**n) + alpha_0
-        dy[3] = -beta * (y[3] - y[0])
-        dy[4] = -beta * (y[4] - y[1])
-        dy[5] = -beta * (y[5] - y[2])
+        # equations
+        dy[0] = alpha0 + alpha / (1 + (y[5]/K)**n) - delta_m * y[0]
+        dy[1] = alpha0 + alpha / (1 + (y[3]/K)**n) - delta_m * y[1]
+        dy[2] = alpha0 + alpha / (1 + (y[4]/K)**n) - delta_m * y[2]
+        dy[3] = beta * y[0] - delta_p * y[3]
+        dy[4] = beta * y[1] - delta_p * y[4]
+        dy[5] = beta * y[2] - delta_p * y[5]
+
         return dy
 
     def simulate(self, parameters, times):
-        alpha_0, alpha, beta, n = parameters
-        y = odeint(self._rhs, self._y0, times, (alpha_0, alpha, beta, n))
+        alpha0, alpha, K, n, delta_m, delta_p, beta = parameters
+        y = odeint(self._rhs, self._y0, times, (alpha0, alpha, K, n, delta_m, delta_p, beta))
         return y[:, :]
 
     def suggested_parameters(self):
         # Toni et al.:
-        return np.array([1, 1000, 5, 2])
+        return np.array([0, 1, 40, 2, 0.3466, 0.1933, 10])
 
         # Figure 42 in book:
         #return np.array([0, 50, 0.2, 2])
 
     def suggested_times(self):
         # Toni et al.:
-        return np.linspace(0, 40, 400)
+        return np.linspace(0,1200, 1000)
 
         # Figure 42 in book:
         #return np.linspace(0, 300, 600)
@@ -476,10 +484,10 @@ def simulator_repr(combination,y,times=None):
     return data
 
 # combination & number of samples
-def generate_data_repr(n, num_samples):
+def generate_data_repr(n, num_samples,data_parameters):
     # Generate the combinations
     if n == 1:
-        combinations = pd.DataFrame([[1, 1000, 5, 2]])
+        combinations = pd.DataFrame([data_parameters])
     else:
         combinations = CombinationGenerator_repr(n)
     # transform combinations dataframe into a list of list
@@ -504,11 +512,11 @@ def generate_data_repr(n, num_samples):
     np.random.shuffle(data)
     return data
 
-def isolated_repressilator_fn(n, num_samples, time_points, time_intervals, path = 'data/'):
+def isolated_repressilator_fn(n, num_samples, time_points, time_intervals,data_parameters, path = 'data/'):
     # generate time points
     times = np.linspace(0, time_intervals, time_points)
     # generate parameter and initial values combinations
-    combinations = generate_data_repr(n, num_samples)
+    combinations = generate_data_repr(n, num_samples,data_parameters)
     dataset = pd.DataFrame()
     for idx, combi in enumerate(combinations):
         # call the ODE system solver
@@ -520,7 +528,7 @@ def isolated_repressilator_fn(n, num_samples, time_points, time_intervals, path 
         dataset = pd.concat([dataset, sol_df])
     
     # save data to file as pickle the name should be isolated_repressilator_nparameters_num_smaples_time_points_time_intervals.pkl
-    dataset.to_pickle(os.path.join(path, 'isolated_repressilator_{}_{}_{}_{}.pkl'.format(n, num_samples, time_points, time_intervals)))
+    dataset.to_pickle(os.path.join(path, 'isolated_repressilator_{}_{}_{}_{}_param_{}.pkl'.format(n, num_samples, time_points, time_intervals,data_parameters)))
 
     return dataset
 
@@ -572,8 +580,8 @@ class ForcedDuffingOscillator:
             self._y0 = np.array(y0, dtype=float)
             if len(self._y0) != 2:
                 raise ValueError('Initial value must have size 2.')
-            if np.any(self._y0 < 0):
-                raise ValueError('Initial states can not be negative.')
+            #if np.any(self._y0 < 0):
+            #    raise ValueError('Initial states can not be negative.')
 
     def n_outputs(self):
         """Returns the number of state variables."""
@@ -702,7 +710,15 @@ def simulator_dfn(combination,y,times=None):
 # combination & number of samples
 def generate_data_dfn(n, num_samples):
     # Generate the combinations
-    combinations = CombinationGenerator_dfn(n)
+
+
+    # this part didn't exist before, but it is needed to make the code work to get the choatic behavior 
+    # and also y0 will be changed from 0 to 10 to -2,2 
+    # and also I will remove the condition that data shouldn't be negative
+    if n == 1:
+        combinations = pd.DataFrame([[0.2, 1.0, -1.0, 0.3, 1.2]])
+    else:
+        combinations = CombinationGenerator_dfn(n)
     # transform combinations dataframe into a list of list
     combinations = combinations.values.tolist()
     # initial conditions
@@ -711,7 +727,7 @@ def generate_data_dfn(n, num_samples):
     else:
         y = []
         for i in range(num_samples):
-            y0 = np.random.uniform(0, 10, 2)
+            y0 = np.random.uniform(-2, 2, 2)
             y0 = y0.tolist()
             y.append(y0)
     
