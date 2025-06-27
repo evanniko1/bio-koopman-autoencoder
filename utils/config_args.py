@@ -18,7 +18,7 @@ def get_args():
     parser.add_argument('--num_samples', type=int, default=6000, help='number of samples per combination or initial conditions')
     parser.add_argument('--time_steps', type=int, default=51, help='number of time steps in trajectories')
     parser.add_argument('--max_time', type=int, default=1, help='maximum time value for trajectory generation')
-    parser.add_argument('--data_parameters', type=float,nargs='+', default=[0.03, 10, 40, 2, 0.346, 0.0693, 10], help='list of parameters for generating data')
+    parser.add_argument('--data_parameters', type=float,nargs='+', default=None, help='list of parameters for generating data')
     
     # Training configuration
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')

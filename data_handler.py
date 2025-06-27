@@ -29,6 +29,21 @@ class KoopmanDataHandler:
         self.prediction_length = config.get("prediction_length", 10)
         self.stride = config.get("stride", None)
         self.data_parameters = config.get("data_parameters", None)
+
+        # default parameters depending on the dataset
+        default_params = {
+            "isolated_repressilator": [1,1000,1,2,1,5,5],
+            "duffing_oscillator": [0, 1.0, -1.0, 0, 1.2],
+            "goodwin_oscillator": [360, 43, 1.0, 12, 0.6, 1.0, 1.0, 1.0, 0.8],
+            "Lorenz": [10.0, 28.0, 8.0/3.0]
+        }
+        
+        if self.data_parameters is None:
+            if self.dataset_name in default_params:
+                self.data_parameters = default_params[self.dataset_name]
+            else:
+                self.data_parameters = None
+
         
         # Initialize data attributes
         self.raw_data = None
@@ -45,7 +60,11 @@ class KoopmanDataHandler:
         elif self.dataset_name == "isolated_repressilator":
             filename = f'isolated_repressilator_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
         elif self.dataset_name == "duffing_oscillator":
-            filename = f'duffing_oscillator_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}.pkl'
+            filename = f'duffing_oscillator_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
+        elif self.dataset_name == "goodwin_oscillator":
+            filename = f'goodwin_oscillator_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
+        elif self.dataset_name == "Lorenz":
+            filename = f'lorenz_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
         elif self.dataset_name == "host_aware_repressilator":
             # Special case: load directly from CSV
             df = pd.read_csv("./results_perturbation_joint_induction_binding_rate.csv")
@@ -80,7 +99,7 @@ class KoopmanDataHandler:
         if not os.path.isfile(filepath):
             print('Generating data...')
             kwargs = {}
-            if self.dataset_name in ["isolated_repressilator", "duffing_oscillator"]:
+            if self.dataset_name in ["isolated_repressilator", "duffing_oscillator", "goodwin_oscillator", "Lorenz"]:
                 kwargs = {
                     "combi_n": self.num_combinations,
                     "combi_n_samples": self.num_samples,

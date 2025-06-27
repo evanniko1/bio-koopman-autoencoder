@@ -46,6 +46,8 @@ def data_from_name(name, combi_n = 1, combi_n_samples = 5000, time_points = 50, 
         Parameter for pendulum systems, default is 2.4
     orthogonal_project : bool, optional
         Whether to apply orthogonal projection to the data, default is False
+    data_parameters : list, optional
+        Parameters for the system
     path : str, optional
         Directory path to save/load datasets, default is 'data/'
 
@@ -82,7 +84,11 @@ def data_from_name(name, combi_n = 1, combi_n_samples = 5000, time_points = 50, 
     elif name == "isolated_repressilator":
         return isolated_repressilator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
     elif name == "duffing_oscillator":
-        return duffing_oscillator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals, path=path)
+        return duffing_oscillator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
+    elif name == "goodwin_oscillator":
+        return goodwin_oscillator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
+    elif name == "Lorenz":
+        return lorenz_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
     else:
         raise ValueError('dataset {} not recognized'.format(name))
     
@@ -708,7 +714,7 @@ def simulator_dfn(combination,y,times=None):
     return data
 
 # combination & number of samples
-def generate_data_dfn(n, num_samples):
+def generate_data_dfn(n, num_samples,data_parameters):
     # Generate the combinations
 
 
@@ -716,7 +722,7 @@ def generate_data_dfn(n, num_samples):
     # and also y0 will be changed from 0 to 10 to -2,2 
     # and also I will remove the condition that data shouldn't be negative
     if n == 1:
-        combinations = pd.DataFrame([[0.2, 1.0, -1.0, 0.3, 1.2]])
+        combinations = pd.DataFrame([data_parameters])
     else:
         combinations = CombinationGenerator_dfn(n)
     # transform combinations dataframe into a list of list
@@ -741,11 +747,11 @@ def generate_data_dfn(n, num_samples):
     np.random.shuffle(data)
     return data
 
-def duffing_oscillator_fn(n, num_samples, time_points, time_intervals, path = 'data/'):
+def duffing_oscillator_fn(n, num_samples, time_points, time_intervals,data_parameters, path = 'data/'):
     # generate time points
     times = np.linspace(0, time_intervals, time_points)
     # generate parameter and initial values combinations
-    combinations = generate_data_dfn(n, num_samples)
+    combinations = generate_data_dfn(n, num_samples,data_parameters)
     dataset = pd.DataFrame()
     for idx, combi in enumerate(combinations):
         # call the ODE system solver
@@ -756,6 +762,296 @@ def duffing_oscillator_fn(n, num_samples, time_points, time_intervals, path = 'd
         # concatenate existing dataframes
         dataset = pd.concat([dataset, sol_df])
     # save dataset
-    dataset.to_pickle(os.path.join(path, 'duffing_oscillator_{}_{}_{}_{}.pkl'.format(n, num_samples, time_points, time_intervals)))
+    dataset.to_pickle(os.path.join(path, 'duffing_oscillator_{}_{}_{}_{}_param_{}.pkl'.format(n, num_samples, time_points, time_intervals,data_parameters)))
+
+    return dataset
+
+
+#******************************************************************************
+# Goodwin's ODE system
+#******************************************************************************
+
+
+class GoodwinOscillator:
+    """
+    Goodwin oscillator model.
+
+    ODE system:
+        dX/dt = a1 / (kappa1 + k1 * Z^n) - b1 * X
+        dY/dt = alpha1 * X - beta1 * Y
+        dZ/dt = gamma1 * Y - delta1 * Z
+
+    Parameters
+    ----------
+    y0 : array-like
+        Initial state of the system [X, Y, Z]
+    """
+
+    def __init__(self, y0=None):
+        super(GoodwinOscillator, self).__init__()
+        if y0 is None:
+            self._y0 = np.array([1.0, 1.0, 1.0])
+        else:
+            self._y0 = np.array(y0, dtype=float)
+            if len(self._y0) != 3:
+                raise ValueError("Initial value must have size 3.")
+
+    def n_outputs(self):
+        return 3
+
+    def n_parameters(self):
+        return 8  # a1, kappa1, k1, n, b1, alpha1, beta1, gamma1, delta1
+
+    def _rhs(self, S, t, a1, kappa1, k1, n, b1, alpha1, beta1, gamma1, delta1):
+        """
+        Right-hand side of the system.
+        """
+        X, Y, Z = S
+        dS = np.zeros(3)
+        dS[0] = a1 / (kappa1 + k1 * Z**n) - b1 * X
+        dS[1] = alpha1 * X - beta1 * Y
+        dS[2] = gamma1 * Y - delta1 * Z
+        return dS
+
+    def simulate(self, parameters, times):
+        return odeint(self._rhs, self._y0, times, args=tuple(parameters))
+
+    def suggested_parameters(self):
+        # Sample parameters that generate oscillations
+        return [360, 43, 1.0, 12, 0.6, 1.0, 1.0, 1.0, 0.8]
+
+    def suggested_times(self):
+        return np.linspace(0, 20, 200)
+    
+
+# Placeholder Combination Generator
+def CombinationGenerator_gdw(n):
+    """
+    Placeholder function to generate parameter combinations for Goodwin oscillator.
+    """
+    # Define parameter ranges for each parameter
+    a1_range = (100, 500)
+    kappa1_range = (10, 100)
+    k1_range = (0.5, 2)
+    n_range = (6, 15)
+    b1_range = (0.1, 1.0)
+    alpha1_range = (0.5, 2.0)
+    beta1_range = (0.5, 2.0)
+    gamma1_range = (0.5, 2.0)
+    delta1_range = (0.2, 1.0)
+
+    combinations = pd.DataFrame({
+        'a1': np.random.uniform(*a1_range, n),
+        'kappa1': np.random.uniform(*kappa1_range, n),
+        'k1': np.random.uniform(*k1_range, n),
+        'n': np.random.uniform(*n_range, n),
+        'b1': np.random.uniform(*b1_range, n),
+        'alpha1': np.random.uniform(*alpha1_range, n),
+        'beta1': np.random.uniform(*beta1_range, n),
+        'gamma1': np.random.uniform(*gamma1_range, n),
+        'delta1': np.random.uniform(*delta1_range, n),
+    })
+
+    return combinations.head(n)
+
+
+
+# Simulator Function
+def simulator_gdw(combination, y, times=None):
+    if times is None:
+        times = GoodwinOscillator().suggested_times()
+
+    model = GoodwinOscillator(y0=y)
+    data = model.simulate(combination, times)
+
+    # Optional: Add noise here if needed
+    return data
+
+
+
+# Generate Parameter & Initial Condition Combinations
+def generate_data_gdw(n, num_samples, data_parameters):
+    if n == 1:
+        combinations = pd.DataFrame([data_parameters])
+    else:
+        combinations = CombinationGenerator_gdw(n)
+
+    combinations = combinations.values.tolist()
+
+    if num_samples == 1:
+        y = np.array([1.0, 1.0, 1.0]).tolist()
+    else:
+        y = [np.random.uniform(-2, 2, 3).tolist() for _ in range(num_samples)]
+
+    data = []
+    for combination in combinations:
+        for y0 in y:
+            data.append((combination, y0))
+
+    np.random.shuffle(data)
+    return data
+
+
+
+# Dataset Generator Function
+def goodwin_oscillator_fn(n, num_samples, time_points, time_intervals, data_parameters, path='data/'):
+    times = np.linspace(0, time_intervals, time_points)
+    combinations = generate_data_gdw(n, num_samples, data_parameters)
+
+    dataset = pd.DataFrame()
+    for idx, combi in enumerate(combinations):
+        sol = simulator_gdw(combi[0], combi[1], times)
+        sol_df = pd.DataFrame(sol)
+        sol_df.index = [idx] * len(times)
+        dataset = pd.concat([dataset, sol_df])
+
+    os.makedirs(path, exist_ok=True)
+    filename = f'goodwin_oscillator_{n}_{num_samples}_{time_points}_{time_intervals}_param_{str(data_parameters).replace(" ", "").replace(",", "_")}.pkl'
+    dataset.to_pickle(os.path.join(path, filename))
+
+    return dataset
+
+#******************************************************************************
+# The Lorenz System
+#******************************************************************************
+
+import numpy as np
+from scipy.integrate import odeint
+import matplotlib.pyplot as plt
+
+class LorenzSystem:
+    """
+    The Lorenz system is a classic system of three coupled nonlinear differential
+    equations originally developed to model atmospheric convection.
+
+    It is known for its chaotic behavior and the iconic "butterfly" attractor.
+
+    The system is defined as:
+
+    .. math::
+        \\dot{x} = \\sigma(y - x) \\\\
+        \\dot{y} = x(\\rho - z) - y \\\\
+        \\dot{z} = xy - \\beta z
+
+    Parameters
+    ----------
+    y0 : array-like
+        Initial state of the system [x, y, z].
+
+    References
+    ----------
+    .. [1] Edward N. Lorenz (1963). "Deterministic Nonperiodic Flow". Journal
+           of the Atmospheric Sciences.
+
+    .. [2] https://en.wikipedia.org/wiki/Lorenz_system
+    """
+
+    def __init__(self, y0=None):
+        super(LorenzSystem, self).__init__()
+
+        if y0 is None:
+            self._y0 = np.array([1.0, 1.0, 1.0])
+        else:
+            self._y0 = np.array(y0, dtype=float)
+            if len(self._y0) != 3:
+                raise ValueError("Initial value must have size 3.")
+
+    def n_outputs(self):
+        return 3
+
+    def n_parameters(self):
+        return 3
+
+    def _rhs(self, y, t, sigma, rho, beta):
+        """
+        Calculates the right-hand side of the Lorenz system.
+        """
+        x, y_, z = y
+        dxdt = sigma * (y_ - x)
+        dydt = x * (rho - z) - y_
+        dzdt = x * y_ - beta * z
+        return [dxdt, dydt, dzdt]
+
+    def simulate(self, parameters, times):
+        sigma, rho, beta = parameters
+        y = odeint(self._rhs, self._y0, times, args=(sigma, rho, beta))
+        return y[:, :]
+
+    def suggested_parameters(self):
+        return np.array([10.0, 28.0, 8.0/3.0])
+
+    def suggested_times(self):
+        return np.linspace(0, 40, 10000)
+    
+
+
+# Parameter Combination Generator
+def CombinationGenerator_lrz(n):
+    """
+    Generates `n` random parameter combinations for the Lorenz system.
+    """
+    sigma_range = (5, 15)
+    rho_range = (20, 40)
+    beta_range = (2, 3.5)
+
+    combinations = pd.DataFrame({
+        'sigma': np.random.uniform(*sigma_range, n),
+        'rho': np.random.uniform(*rho_range, n),
+        'beta': np.random.uniform(*beta_range, n)
+    })
+
+    return combinations.head(n)
+
+
+
+# Simulator Function
+def simulator_lrz(combination, y, times=None):
+    if times is None:
+        times = LorenzSystem().suggested_times()
+
+    model = LorenzSystem(y0=y)
+    return model.simulate(combination, times)
+
+
+
+# Generate Parameter & Initial State Combinations
+def generate_data_lrz(n, num_samples, data_parameters):
+    if n == 1:
+        combinations = pd.DataFrame([data_parameters])
+    else:
+        combinations = CombinationGenerator_lrz(n)
+
+    combinations = combinations.values.tolist()
+
+    if num_samples == 1:
+        y = np.array([1.0, 1.0, 1.0]).tolist()
+    else:
+        y = [np.random.uniform(-2, 2, 3).tolist() for _ in range(num_samples)]
+
+    data = []
+    for combination in combinations:
+        for y0 in y:
+            data.append((combination, y0))
+
+    np.random.shuffle(data)
+    return data
+
+
+
+# Dataset Generator Function
+def lorenz_fn(n, num_samples, time_points, time_intervals, data_parameters, path='data/'):
+    times = np.linspace(0, time_intervals, time_points)
+    combinations = generate_data_lrz(n, num_samples, data_parameters)
+
+    dataset = pd.DataFrame()
+    for idx, combi in enumerate(combinations):
+        sol = simulator_lrz(combi[0], combi[1], times)
+        sol_df = pd.DataFrame(sol)
+        sol_df.index = [idx] * len(times)
+        dataset = pd.concat([dataset, sol_df])
+
+    os.makedirs(path, exist_ok=True)
+    filename = f'lorenz_{n}_{num_samples}_{time_points}_{time_intervals}_param_{str(data_parameters).replace(" ", "").replace(",", "_")}.pkl'
+    dataset.to_pickle(os.path.join(path, filename))
 
     return dataset
