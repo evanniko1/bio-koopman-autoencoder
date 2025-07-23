@@ -761,3 +761,85 @@ class Trainer:
                 Y_history.append(final_prediction.squeeze(0))
         
         return Xpred, Y_history, reenc_points, mse_history
+    
+    
+    def predict_new_window_variance(self, X0, window_size=10, variance_threshold=2.0, steps=50):
+        """
+        Predict with reencoding based on variance of MSE differences in a sliding window.
+        
+        Args:
+            X0: Initial condition
+            window_size: Size of sliding window for variance calculation
+            variance_threshold: Threshold multiplier (reencoder if current_diff > mean + threshold*std)
+            steps: Number of prediction steps
+        
+        Returns:
+            tuple: (Xpred, Ypred, reenc_points, mse_history)
+        """
+        self.model.eval()
+        if not isinstance(X0, torch.Tensor):
+            X0 = torch.tensor(X0, device=self.device)
+        
+        X0_batch = X0.unsqueeze(0) if X0.ndim == 1 else X0
+        Xpred = torch.zeros((steps+1, *X0.shape), device=self.device)
+        Xpred[0] = X0
+        
+        reenc_points = []
+        mse_history = []  # Store MSE differences for window analysis
+        
+        with torch.no_grad():
+            Y0 = self.model.ae.encoder(X0_batch)
+            Y_history = [Y0.squeeze(0)]
+            
+            latent_dim = Y0.shape[-1]
+            Ypred = torch.zeros((steps+1, latent_dim), device=self.device)
+            Ypred[0] = Y0.squeeze(0)
+            
+            # First step
+            Y_next = self.model.knet(Y0)
+            Xpred[1] = self.model.ae.decoder(Y_next).squeeze(0)
+            Ypred[1] = Y_next.squeeze(0)
+            Y_history.append(Y_next.squeeze(0))
+            
+            # Calculate initial MSE difference for window
+            Y_decoded = self.model.ae.decoder(Y_next)
+            Y_reenc = self.model.ae.encoder(Y_decoded)
+            Y_reenc_pred = self.model.knet(Y_reenc)
+            mse_diff = torch.mean((Y_reenc_pred - Y_next) ** 2).item()
+            mse_history.append(mse_diff)
+            
+            for t in range(2, steps+1):
+                # Prediction step
+                if t < self.args.context_length:
+                    context = torch.stack(Y_history[:t]).unsqueeze(0)
+                else:
+                    context = torch.stack(Y_history[-self.args.context_length:]).unsqueeze(0)
+                
+                aft_output = Y_history[-1] + self.model.aft_layer(context)
+                Y_next = self.model.knet(aft_output)
+                Xpred[t] = self.model.ae.decoder(Y_next).squeeze(0)
+                Ypred[t] = Y_next.squeeze(0)
+                
+                # Calculate MSE difference for current point
+                Y_decoded = self.model.ae.decoder(Y_next)
+                Y_reenc = self.model.ae.encoder(Y_decoded)
+                Y_reenc_pred = self.model.knet(Y_reenc)
+                current_mse_diff = torch.mean((Y_reenc_pred - Y_next) ** 2).item()
+                mse_history.append(current_mse_diff)
+                
+                # Window-based variance check
+                if len(mse_history) >= window_size:
+                    window_data = mse_history[-window_size:]
+                    window_mean = sum(window_data) / len(window_data)
+                    window_var = sum((x - window_mean) ** 2 for x in window_data) / len(window_data)
+                    window_std = window_var ** 0.5
+                    
+                    # Reencoder if current difference exceeds threshold
+                    if current_mse_diff > window_mean + variance_threshold * window_std:
+                        Y_next = self.model.ae.encoder(Xpred[t])
+                        Ypred[t] = Y_next.squeeze(0)
+                        reenc_points.append(t)
+                
+                Y_history.append(Y_next.squeeze(0))
+        
+        return Xpred, Ypred, reenc_points, mse_history

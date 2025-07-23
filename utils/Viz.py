@@ -141,60 +141,107 @@ def plot_trajectories(ref_trajectory, pred_trajectory, recon_trajectory, folder_
     else:
         plt.show()
 
-def plot_trajectory_comparison(ref_trajectory, pred_trajectory, recon_trajectory, folder_path='', save=True):
+def plot_trajectory_comparison(ref_trajectory, pred_trajectory, recon_trajectory, 
+                               time=None, folder_path='', save=True):
     """
-    Plots the reference, predicted, and reconstructed trajectories for each dimension over time.
+    Plots reference, predicted, and reconstructed trajectories over time steps.
+    X-axis always shows step indices. When time is provided, it's shown on the top axis.
 
     Parameters:
-    ref_trajectory (numpy.ndarray): The reference trajectory, shape (length, dimensions).
-    pred_trajectory (numpy.ndarray): The predicted trajectory, shape (length, dimensions).
-    recon_trajectory (numpy.ndarray): The reconstructed trajectory, shape (length, dimensions).
-    folder_path (str): Path to save the plot (optional).
+        ref_trajectory (np.ndarray): Reference trajectory, shape (length, dimensions)
+        pred_trajectory (np.ndarray): Predicted trajectory, shape (length, dimensions)
+        recon_trajectory (np.ndarray): Reconstructed trajectory, shape (length, dimensions)
+        time (np.ndarray, optional): Time array, shape (length,)
+        folder_path (str): Path to save the figure (optional)
+        save (bool): If True, saves the plot; otherwise, displays it
+
+    Returns:
+        fig, axes: Matplotlib figure and axes
     """
-    # Ensure trajectories are numpy arrays
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import os
+
     ref_trajectory = np.asarray(ref_trajectory)
     pred_trajectory = np.asarray(pred_trajectory)
     recon_trajectory = np.asarray(recon_trajectory)
-    
-    # Get length and dimensions from reference trajectory
-    length = ref_trajectory.shape[0]
-    dimensions = ref_trajectory.shape[1]
 
-    # Check if all trajectories have the same shape as the reference
+    length, dimensions = ref_trajectory.shape
+
     if pred_trajectory.shape != ref_trajectory.shape or recon_trajectory.shape != ref_trajectory.shape:
-        raise ValueError(f"All trajectories must have shape {ref_trajectory.shape}")
+        raise ValueError("All trajectories must have the same shape.")
 
-    # Time array based on length
-    time = np.linspace(0, 1, length)  # Length time steps from 0 to 1
+    # X-axis is always step indices
+    step_indices = np.arange(length)
+    
+    if time is not None:
+        time = np.asarray(time)
+        if time.shape[0] != length:
+            raise ValueError("Time array length must match trajectory length.")
+        use_custom_time = True
+    else:
+        use_custom_time = False
 
-    # Create subplots: one for each dimension
-    fig, axes = plt.subplots(dimensions, 1, figsize=(10, 4 * dimensions), sharex=True)
+    fig, axes = plt.subplots(dimensions, 1, figsize=(12, 4 * dimensions), sharex=True, dpi=100)
 
-    # Handle case of single dimension (axes won't be a list)
     if dimensions == 1:
         axes = [axes]
 
-    # Plot each dimension
     for dim in range(dimensions):
-        axes[dim].plot(time, ref_trajectory[:, dim], label=f'Reference (Dim {dim})', 
-                       color='blue', linewidth=2)
-        axes[dim].plot(time, pred_trajectory[:, dim], label=f'Predicted (Dim {dim})', 
-                       color='red', linestyle='--', linewidth=2)
-        axes[dim].plot(time, recon_trajectory[:, dim], label=f'Reconstructed (Dim {dim})', 
-                       color='green', linestyle='-.', linewidth=2)
-        axes[dim].set_title(f'Dimension {dim} Over Time', fontsize=14)
-        axes[dim].set_ylabel('Value', fontsize=12)
-        axes[dim].legend()
-        axes[dim].grid(True)
+        ax = axes[dim]
+        # Plot against step indices
+        ax.plot(step_indices, ref_trajectory[:, dim], label=f'Reference (Dim {dim})', color='blue', linewidth=2.5)
+        ax.plot(step_indices, pred_trajectory[:, dim], label=f'Predicted (Dim {dim})', color='red', linestyle='--', linewidth=2.5)
+        ax.plot(step_indices, recon_trajectory[:, dim], label=f'Reconstructed (Dim {dim})', color='green', linestyle='-.', linewidth=2.5)
 
-    # Set x-label only on the last subplot
-    axes[-1].set_xlabel('Time', fontsize=12)
+        ax.set_title(f'Dimension {dim} Over Time Steps', fontsize=16, pad=10)
+        ax.set_ylabel('Value', fontsize=14)
+        ax.legend(loc='best', fontsize=12, frameon=True, edgecolor='black')
+        ax.grid(True, linestyle='--', alpha=0.7, zorder=-1)
+        ax.tick_params(axis='both', labelsize=12)
 
-    # Adjust layout and save
-    plt.tight_layout()
+    # Bottom axis always shows step indices
+    axes[-1].set_xlabel('Step Index', fontsize=14, labelpad=10)
+
+    # Top axis shows time if provided, otherwise also step indices
+    ax_top = axes[0].twiny()
+    if use_custom_time:
+        # Map step indices to time values for the top axis
+        ax_top.set_xlim(0, length - 1)
+        
+        # Choose 5 evenly spaced step indices for tick marks
+        tick_step_indices = np.linspace(0, length - 1, 5, dtype=int)
+        corresponding_times = time[tick_step_indices]
+        
+        ax_top.set_xticks(tick_step_indices)
+        ax_top.set_xticklabels([f'{t:.3f}' for t in corresponding_times])
+        ax_top.set_xlabel('Time', fontsize=14, labelpad=10)
+    else:
+        # If no time provided, top axis also shows step indices (redundant but consistent)
+        ax_top.set_xlim(0, length - 1)
+        ax_top.set_xticks(np.linspace(0, length - 1, 5, dtype=int))
+        ax_top.set_xlabel('Step Index', fontsize=14, labelpad=10)
+    
+    ax_top.tick_params(axis='both', labelsize=12)
+
+    # Add top banner
+    if use_custom_time:
+        t_min, t_max = time.min(), time.max()
+        delta_t = np.mean(np.diff(time))
+        banner_text = f"Time Range: {t_min:.3f} to {t_max:.3f} | Δt ≈ {delta_t:.3f} | {length} steps"
+        fig.text(0.5, 0.98, banner_text, ha='center', va='top', fontsize=12,
+                 bbox=dict(boxstyle='round,pad=0.5', facecolor='lightgray', edgecolor='gray', alpha=0.9))
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+    else:
+        banner_text = f"{length} time steps"
+        fig.text(0.5, 0.98, banner_text, ha='center', va='top', fontsize=12,
+                 bbox=dict(boxstyle='round,pad=0.5', facecolor='lightgray', edgecolor='gray', alpha=0.9))
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    # Save or show
     save_path = os.path.join(folder_path, 'trajectory_comparison.png') if folder_path else 'trajectory_comparison.png'
     if save:
-        plt.savefig(save_path)
+        fig.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
     else:
         plt.show()
     

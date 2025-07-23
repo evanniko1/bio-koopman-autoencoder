@@ -43,7 +43,7 @@
   "spline_knots": 5,
   "folder": "pendulum_AFT_DR",
   "save": true,
-  "load_from_checkpoint": false,
+  "load_from_checkpoint": true,
   "seed": 1,
   "opt_params": "lr,batch",
   "num_trials": 10
