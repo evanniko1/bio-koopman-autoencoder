@@ -35,7 +35,17 @@ class KoopmanDataHandler:
             "isolated_repressilator": [1,1000,1,2,1,5,5],
             "duffing_oscillator": [0, 1.0, -1.0, 0, 1.2],
             "goodwin_oscillator": [360, 43, 1.0, 12, 0.6, 1.0, 1.0, 1.0, 0.8],
-            "Lorenz": [10.0, 28.0, 8.0/3.0]
+            "Lorenz": [10.0, 28.0, 2.666],
+            "LotkaVolterra" : [0.2, 0.2, 0.2, 0.2],
+            "IRMA": {
+            'alpha': [0, 1.49E-4, 3E-3, 7.4E-4, 6.1E-4],
+            'v': [0.04, 0.026, 0.02, 0.014, 0.018],
+            'k': [3.5E-4, 3.7E-2, 0.01, 1.884, 4.77E-2],
+            'h': [1, 4, 4, 1, 4, 4],
+            'd': [0.022, 0.047, 0.421, 0.098, 0.05],
+            'gamma': 0.6
+        },
+            "Rossler": [0.2, 0.2, 5.7] 
         }
         
         if self.data_parameters is None:
@@ -55,6 +65,9 @@ class KoopmanDataHandler:
         # Determine filename based on dataset
         if self.dataset_name == "discrete_spectrum":
             filename = 'discrete_spectrum.pkl'
+        elif self.dataset_name == "pendulum":
+            # pendulum_{num_samples}_{time_points}_{time_intervals}.pkl
+            filename = f'pendulum_{self.num_samples}_{self.time_steps}_{self.max_time}.pkl'
         elif self.dataset_name == "simple":
             filename = 'simple.pkl'
         elif self.dataset_name == "isolated_repressilator":
@@ -65,6 +78,12 @@ class KoopmanDataHandler:
             filename = f'goodwin_oscillator_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
         elif self.dataset_name == "Lorenz":
             filename = f'lorenz_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
+        elif self.dataset_name == "LotkaVolterra":
+            filename = f'lotka_volterra_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
+        elif self.dataset_name == "IRMA":
+            filename = f"irma_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}.pkl"
+        elif self.dataset_name == "Rossler":
+            filename = f'rossler_{self.num_combinations}_{self.num_samples}_{self.time_steps}_{self.max_time}_param_{self.data_parameters}.pkl'
         elif self.dataset_name == "host_aware_repressilator":
             # Special case: load directly from CSV
             df = pd.read_csv("./results_perturbation_joint_induction_binding_rate.csv")
@@ -99,7 +118,7 @@ class KoopmanDataHandler:
         if not os.path.isfile(filepath):
             print('Generating data...')
             kwargs = {}
-            if self.dataset_name in ["isolated_repressilator", "duffing_oscillator", "goodwin_oscillator", "Lorenz"]:
+            if self.dataset_name in ["isolated_repressilator", "duffing_oscillator", "goodwin_oscillator", "Lorenz", "LotkaVolterra", "pendulum", "IRMA", "Rossler"]:
                 kwargs = {
                     "combi_n": self.num_combinations,
                     "combi_n_samples": self.num_samples,

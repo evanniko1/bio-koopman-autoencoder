@@ -66,12 +66,14 @@ def data_from_name(name, combi_n = 1, combi_n_samples = 5000, time_points = 50, 
     path = os.path.join(os.getcwd(), path)
     if not os.path.exists(path):
         os.makedirs(path)
-    if name == 'pendulum_lin':
-        return pendulum_lin(noise, orthog_project=orthogonal_project,path=path)  
-    if name == 'simple':
-        return simple()    
-    elif name == 'pendulum':
-        return pendulum_lin(noise, theta, lin=False, orthog_project=orthogonal_project,path=path)    
+    #if name == 'pendulum_lin':
+    #    return pendulum_lin(noise, orthog_project=orthogonal_project,path=path)  
+    #elif name == 'pendulum':
+    #    return pendulum_lin(noise, theta, lin=False, orthog_project=orthogonal_project,path=path)  
+    if name == 'pendulum':
+        return generate_pendulum_data(num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals, path=path)
+    elif name == 'simple':
+        return simple()      
     elif name == 'discrete_spectrum':
         x1range = [-0.5, 0.5]
         x2range = [-0.5, 0.5]
@@ -89,6 +91,12 @@ def data_from_name(name, combi_n = 1, combi_n_samples = 5000, time_points = 50, 
         return goodwin_oscillator_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
     elif name == "Lorenz":
         return lorenz_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
+    elif name == "LotkaVolterra":
+        return lotka_volterra_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path) 
+    elif name == "IRMA":
+        return irma_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
+    elif name == "Rossler":
+        return rossler_dataset_fn(n=combi_n, num_samples=combi_n_samples, time_points=time_points, time_intervals=time_intervals,data_parameters=data_parameters, path=path)
     else:
         raise ValueError('dataset {} not recognized'.format(name))
     
@@ -168,9 +176,90 @@ def pendulum_lin(noise, theta=0.8, lin=True, orthog_project=False, path = 'data/
 
     return X, Xclean, m, 1
 
-
 #******************************************************************************
 # Pendulum system
+###******************************************************************************
+class PendulumModel:
+    """
+    Simple pendulum model with damping.
+
+    ODE system:
+        dtheta/dt = omega
+        domega/dt = -(g / l) * sin(theta) - b * omega
+
+    Parameters
+    ----------
+    y0 : array-like
+        Initial state of the system [theta (angle in radians), omega (angular velocity)]
+    g : float
+        Gravitational constant (default: 9.81 m/s²)
+    l : float
+        Length of the pendulum (default: 1.0 m)
+    b : float
+        Damping coefficient (default: 0.2)
+    """
+
+    def __init__(self, y0=None, g=9.81, l=1.0, b=0.2):
+        if y0 is None:
+            # Default: 10 degree offset from inverted position => pi ± 10°
+            self._y0 = np.array([np.pi + np.deg2rad(10), 0.0])
+        else:
+            self._y0 = np.array(y0, dtype=float)
+            if len(self._y0) != 2:
+                raise ValueError("Initial value must have size 2.")
+        self.g = g
+        self.l = l
+        self.b = b
+
+    def _rhs(self, S, t):
+        theta, omega = S
+        dtheta_dt = omega
+        domega_dt = -(self.g / self.l) * np.sin(theta) - self.b * omega
+        return [dtheta_dt, domega_dt]
+
+    def simulate(self, times):
+        return odeint(self._rhs, self._y0, times)
+
+    def suggested_times(self):
+        return np.linspace(0, 20, 1000)  # simulate for 20 seconds with more points
+
+def generate_pendulum_data(num_samples, time_points, time_intervals, path='data/'):
+    """
+    Generate simulated pendulum trajectories as a NumPy array:
+    shape = (num_samples, time_points, 2)
+
+    Returns
+    -------
+    np.ndarray
+        Array of trajectories (theta, omega)
+    """
+    times = np.linspace(0, time_intervals, time_points)
+    
+
+    data = pd.DataFrame()
+
+    for idx in range(num_samples):
+        theta0 = np.random.uniform(-np.pi, np.pi)
+        omega0 = np.random.uniform(-3.0, 3.0)
+        model = PendulumModel(y0=[theta0, omega0])
+        sol = model.simulate(times)  # shape = (time_points, 2)
+        df = pd.DataFrame(sol)
+        df.index = [idx]*len(times)
+        data = pd.concat([data, df])
+
+        
+
+    os.makedirs(path, exist_ok=True)
+    filename = f'pendulum_{num_samples}_{time_points}_{time_intervals}.pkl'
+    np.save(filename, data)
+
+    return data
+
+
+
+
+#******************************************************************************
+# Simple  system
 #******************************************************************************
 def simple():
     """
@@ -1026,7 +1115,7 @@ def generate_data_lrz(n, num_samples, data_parameters):
     if num_samples == 1:
         y = np.array([1.0, 1.0, 1.0]).tolist()
     else:
-        y = [np.random.uniform(-2, 2, 3).tolist() for _ in range(num_samples)]
+        y = [(np.array([0.0, 1.0, 1.05]) + np.random.normal(0, 1, 3)).tolist() for _ in range(num_samples)]
 
     data = []
     for combination in combinations:
@@ -1055,3 +1144,392 @@ def lorenz_fn(n, num_samples, time_points, time_intervals, data_parameters, path
     dataset.to_pickle(os.path.join(path, filename))
 
     return dataset
+
+#******************************************************************************
+# The Lotka-Volterra System
+#******************************************************************************
+
+class LotkaVolterraSystem:
+    """
+    The Lotka-Volterra system models predator-prey dynamics in ecological systems.
+
+    Equations:
+        dx/dt = alpha*x - beta*x*y
+        dy/dt = delta*x*y - gamma*y
+
+    Parameters:
+        alpha : prey birth rate
+        beta : predation rate
+        delta : predator reproduction rate
+        gamma : predator death rate
+    """
+
+    def __init__(self, y0=None):
+        super(LotkaVolterraSystem, self).__init__()
+
+        if y0 is None:
+            self._y0 = np.array([1.0, 1.0])
+        else:
+            self._y0 = np.array(y0, dtype=float)
+            if len(self._y0) != 2:
+                raise ValueError("Initial value must have size 2.")
+
+    def n_outputs(self):
+        return 2
+
+    def n_parameters(self):
+        return 4
+
+    def _rhs(self, y, t, alpha, beta, delta, gamma):
+        x, y_ = y
+        dxdt = alpha * x - beta * x * y_
+        dydt = delta * x * y_ - gamma * y_
+        return [dxdt, dydt]
+
+    def simulate(self, parameters, times):
+        alpha, beta, delta, gamma = parameters
+        y = odeint(self._rhs, self._y0, times, args=(alpha, beta, delta, gamma))
+        return y[:, :]
+
+    def suggested_parameters(self):
+        return np.array([1.5, 1.0, 1.0, 3.0])
+
+    def suggested_times(self):
+        return np.linspace(0, 200, 200)
+    
+
+# simulator function
+def simulator_lv(combination, y, times=None):
+    if times is None:
+        times = LotkaVolterraSystem().suggested_times()
+
+    model = LotkaVolterraSystem(y0=y)
+    return model.simulate(combination, times)
+
+# Generate Parameter Combinations
+def CombinationGenerator_lv(n):
+    """
+    Generate `n` random parameter combinations for the Lotka-Volterra system.
+    """
+    alpha_range = (0.5, 2.0)
+    beta_range = (0.01, 1.5)
+    delta_range = (0.01, 1.5)
+    gamma_range = (0.5, 3.0)
+
+    combinations = pd.DataFrame({
+        'alpha': np.random.uniform(*alpha_range, n),
+        'beta': np.random.uniform(*beta_range, n),
+        'delta': np.random.uniform(*delta_range, n),
+        'gamma': np.random.uniform(*gamma_range, n),
+    })
+
+    return combinations.head(n)
+
+
+# data generation function
+def generate_data_lv(n, num_samples, data_parameters):
+    if n == 1:
+        combinations = pd.DataFrame([data_parameters])
+    else:
+        combinations = CombinationGenerator_lv(n)
+
+    combinations = combinations.values.tolist()
+
+    if num_samples == 1:
+        y = np.array([1.0, 1.0]).tolist()
+    else:
+        y = [np.random.uniform(0.02, 3, size=2).tolist() for _ in range(num_samples)]
+
+    data = []
+    for combination in combinations:
+        for y0 in y:
+            data.append((combination, y0))
+
+    np.random.shuffle(data)
+    return data
+
+
+# Dataset Generator Function
+def lotka_volterra_fn(n, num_samples, time_points, time_intervals, data_parameters, path='data/'):
+    times = np.linspace(0, time_intervals, time_points)
+    combinations = generate_data_lv(n, num_samples, data_parameters)
+
+    dataset = pd.DataFrame()
+    for idx, combi in enumerate(combinations):
+        sol = simulator_lv(combi[0], combi[1], times)
+        sol_df = pd.DataFrame(sol)
+        sol_df.index = [idx] * len(times)
+        dataset = pd.concat([dataset, sol_df])
+
+    os.makedirs(path, exist_ok=True)
+    filename = f'lotka_volterra_{n}_{num_samples}_{time_points}_{time_intervals}_param_{str(data_parameters).replace(" ", "").replace(",", "_")}.pkl'
+    dataset.to_pickle(os.path.join(path, filename))
+
+    return dataset
+
+    
+
+
+
+#******************************************************************************
+# The IRMA System
+#******************************************************************************
+
+class IRMASystem:
+    """
+    The IRMA (In vivo Reverse-engineering and Modeling Assessment) synthetic gene regulatory network.
+
+    Simulates the dynamics of five interacting genes (CBF1, GAL4, SWI5, GAL80, ASH1).
+    """
+
+    def __init__(self, y0=None):
+        if y0 is None:
+            self._y0 = np.random.rand(5) # CBF1, GAL4, SWI5, GAL80, ASH1
+        else:
+            self._y0 = np.array(y0, dtype=float)
+            if len(self._y0) != 5:
+                raise ValueError("Initial condition must have size 5.")
+
+    def n_outputs(self):
+        return 5
+
+    def n_parameters(self):
+        return 6  # alpha, v, k, h, d, gamma
+
+    def _rhs(self, y, t, alpha, v, k, h, d, gamma):
+        x1, x2, x3, x4, x5 = y
+
+        dx1_dt = alpha[0] + v[0] * (k[0] ** h[0]) / (k[0] ** h[0] + x5 ** h[0]) - d[0] * x1
+        dx2_dt = alpha[1] + v[1] * (x1 ** h[1]) / (k[1] ** h[1] + x1 ** h[1]) - d[1] * x2
+        dx3_dt = alpha[2] + v[2] * (x2 ** h[2]) / (
+            k[2] ** h[2] + x2 ** h[2] * (1 + (x4 ** h[5]) / (gamma ** h[5]))
+        ) - d[2] * x3
+        dx4_dt = alpha[3] + v[3] * (x3 ** h[3]) / (k[3] ** h[3] + x3 ** h[3]) - d[3] * x4
+        dx5_dt = alpha[4] + v[4] * (x3 ** h[4]) / (k[4] ** h[4] + x3 ** h[4]) - d[4] * x5
+
+        return [dx1_dt, dx2_dt, dx3_dt, dx4_dt, dx5_dt]
+
+    def simulate(self, parameters, times):
+        alpha = parameters["alpha"]
+        v = parameters["v"]
+        k = parameters["k"]
+        h = parameters["h"]
+        d = parameters["d"]
+        gamma = parameters["gamma"]
+
+        result = odeint(self._rhs, self._y0, times, args=(alpha, v, k, h, d, gamma))
+        return result[:, :]
+
+    def suggested_parameters(self):
+        return {
+            'alpha': [0, 1.49E-4, 3E-3, 7.4E-4, 6.1E-4],
+            'v': [0.04, 0.026, 0.02, 0.014, 0.018],
+            'k': [3.5E-4, 3.7E-2, 0.01, 1.884, 4.77E-2],
+            'h': [1, 4, 4, 1, 4, 4],
+            'd': [0.022, 0.047, 0.421, 0.098, 0.05],
+            'gamma': 0.6
+        }
+
+    def suggested_times(self):
+        return np.linspace(0, 1500, 1500)
+
+#******************************************************************************
+# Simulator Function
+#******************************************************************************
+
+def simulator_irma(parameter_dict, y0, times=None):
+    if times is None:
+        times = IRMASystem().suggested_times()
+    
+    model = IRMASystem(y0=y0)
+    return model.simulate(parameter_dict, times)
+
+#******************************************************************************
+# Parameter Combination Generator
+#******************************************************************************
+
+def CombinationGenerator_irma(n):
+    """
+    Generate `n` random parameter combinations for the IRMA system.
+    """
+    combinations = []
+
+    for _ in range(n):
+        combo = {
+            'alpha': list(np.random.uniform(0, 0.005, 5)),
+            'v': list(np.random.uniform(0.01, 0.05, 5)),
+            'k': list(np.random.uniform(1e-4, 2.0, 5)),
+            'h': [1, 4, 4, 1, 4, 4],  # Fixed values, only one source of oscillation
+            'd': list(np.random.uniform(0.01, 0.5, 5)),
+            'gamma': np.random.uniform(0.1, 1.0)
+        }
+        combinations.append(combo)
+
+    return combinations
+
+#******************************************************************************
+# Data Generator Function
+#******************************************************************************
+
+def generate_data_irma(n, num_samples, data_parameters=None):
+    if n == 1 and data_parameters is not None:
+        combinations = [data_parameters]
+    else:
+        combinations = CombinationGenerator_irma(n)
+
+    if num_samples == 1:
+        y = np.random.rand(5).tolist()
+        y_list = [y]
+    else:
+        y_list = [np.random.rand(5).tolist() for _ in range(num_samples)]
+
+    data = []
+    for comb in combinations:
+        for y0 in y_list:
+            data.append((comb, y0))
+
+    np.random.shuffle(data)
+    return data
+
+#******************************************************************************
+# Dataset Generator Function
+#******************************************************************************
+
+def irma_fn(n, num_samples, time_points, time_intervals, data_parameters=None, path='data/'):
+    times = np.linspace(0, time_intervals, time_points)
+    combinations = generate_data_irma(n, num_samples, data_parameters)
+
+    dataset = pd.DataFrame()
+    for idx, (params, y0) in enumerate(combinations):
+        sol = simulator_irma(params, y0, times)
+        sol_df = pd.DataFrame(sol)
+        sol_df.index = [idx] * len(times)
+        dataset = pd.concat([dataset, sol_df])
+
+    os.makedirs(path, exist_ok=True)
+    filename = f'irma_{n}_{num_samples}_{time_points}_{time_intervals}.pkl'
+    dataset.to_pickle(os.path.join(path, filename))
+
+    return dataset
+
+
+
+
+#******************************************************************************
+# The Rossler System
+#****************************************************************************** 
+class RosslerSystem:
+    """
+    The Rössler system is a simple model for chaos in a continuous-time dynamical system.
+
+    Equations:
+        dx/dt = -y - z
+        dy/dt = x + a*y
+        dz/dt = b + z*(x - c)
+
+    Parameters:
+        a, b, c : system parameters controlling the chaotic behavior
+    """
+
+    def __init__(self, y0=None):
+        super(RosslerSystem, self).__init__()
+        if y0 is None:
+            self._y0 = np.array([1.0, 1.0, 1.0])
+        else:
+            self._y0 = np.array(y0, dtype=float)
+            if len(self._y0) != 3:
+                raise ValueError("Initial value must have size 3.")
+
+    def n_outputs(self):
+        return 3
+
+    def n_parameters(self):
+        return 3
+
+    def _rhs(self, y, t, a, b, c):
+        x, y_, z = y
+        dxdt = -y_ - z
+        dydt = x + a * y_
+        dzdt = b + z * (x - c)
+        return [dxdt, dydt, dzdt]
+
+    def simulate(self, parameters, times):
+        a, b, c = parameters
+        y = odeint(self._rhs, self._y0, times, args=(a, b, c))
+        return y[:, :]
+
+    def suggested_parameters(self):
+        return np.array([0.2, 0.2, 5.7])
+
+    def suggested_times(self):
+        return np.linspace(0, 100, 10000)
+
+
+# simulator function
+def simulator_rossler(combination, y, times=None):
+    if times is None:
+        times = RosslerSystem().suggested_times()
+
+    model = RosslerSystem(y0=y)
+    return model.simulate(combination, times)
+
+
+# Generate Parameter Combinations
+def CombinationGenerator_rossler(n):
+    """
+    Generate `n` random parameter combinations for the Rössler system.
+    """
+    a_range = (0.1, 0.4)
+    b_range = (0.1, 0.4)
+    c_range = (4.0, 10.0)
+
+    combinations = pd.DataFrame({
+        'a': np.random.uniform(*a_range, n),
+        'b': np.random.uniform(*b_range, n),
+        'c': np.random.uniform(*c_range, n),
+    })
+
+    return combinations.head(n)
+
+
+# Data generation function
+def generate_data_rossler(n, num_samples, data_parameters):
+    if n == 1:
+        combinations = pd.DataFrame([data_parameters])
+    else:
+        combinations = CombinationGenerator_rossler(n)
+
+    combinations = combinations.values.tolist()
+
+    if num_samples == 1:
+        y = np.array([1.0, 1.0, 1.0]).tolist()
+    else:
+        y = [np.random.uniform(0.02, 3, size=3).tolist() for _ in range(num_samples)]
+
+    data = []
+    for combination in combinations:
+        for y0 in y:
+            data.append((combination, y0))
+
+    np.random.shuffle(data)
+    return data
+
+
+# Dataset Generator Function
+def rossler_dataset_fn(n, num_samples, time_points, time_intervals, data_parameters, path='data/'):
+    times = np.linspace(0, time_intervals, time_points)
+    combinations = generate_data_rossler(n, num_samples, data_parameters)
+
+    dataset = pd.DataFrame()
+    for idx, combi in enumerate(combinations):
+        sol = simulator_rossler(combi[0], combi[1], times)
+        sol_df = pd.DataFrame(sol)
+        sol_df.index = [idx] * len(times)
+        dataset = pd.concat([dataset, sol_df])
+
+    os.makedirs(path, exist_ok=True)
+    filename = f'rossler_{n}_{num_samples}_{time_points}_{time_intervals}_param_{str(data_parameters).replace(" ", "").replace(",", "_")}.pkl'
+    dataset.to_pickle(os.path.join(path, filename))
+
+    return dataset
+
