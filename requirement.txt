@@ -5,3 +5,5 @@ tqdm
 optuna
 matplotlib
 joblib
+seaborn
+scipy
